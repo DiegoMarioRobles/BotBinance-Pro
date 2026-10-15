@@ -96,8 +96,15 @@
     <section class="card chartcard" id="chartCardSection">
       <div class="cardhead">
         <div class="row" style="align-items: center; gap: 8px;">
-          <h2>Gráfico de Velas y Barras</h2>
-          <select id="tfSelect" aria-label="Temporalidad del gráfico" title="Temporalidad del gráfico"></select>
+          <h2>Gráfico de Velas</h2>
+          <div class="seg tf-quick-seg" id="tfQuickPills" title="Cambiar temporalidad del gráfico con 1 clic">
+            <button type="button" data-tf="15m">15m</button>
+            <button type="button" data-tf="1h" class="on">1h</button>
+            <button type="button" data-tf="4h">4h</button>
+            <button type="button" data-tf="1d">1d</button>
+            <button type="button" data-tf="1w">1w</button>
+          </div>
+          <select id="tfSelect" aria-label="Todas las temporalidades" title="Más temporalidades"></select>
           <div class="seg"><button id="zoomOut" title="Alejar" aria-label="Alejar">−</button><button id="zoomIn" title="Acercar" aria-label="Acercar">+</button></div>
         </div>
         <div class="row" style="align-items: center; gap: 8px;">
@@ -120,7 +127,11 @@
         <button type="button" class="ind-pill on" data-ind="fib"><span class="ind-dot lfib"></span>Fibonacci</button>
         <button type="button" class="ind-pill on" data-ind="strat"><span class="ind-dot lstrat"></span>Estrategia (SL/TP)</button>
       </div>
-      <div class="chartwrap" id="chartWrap"><canvas id="chart"></canvas><div id="tip" class="tip" hidden></div></div>
+      <div class="chartwrap" id="chartWrap">
+        <canvas id="chart"></canvas>
+        <div id="chartLoadingOverlay" class="chart-loading-overlay"><span>⌛ Cargando velas…</span></div>
+        <div id="tip" class="tip" hidden></div>
+      </div>
       <small class="muted" id="tfRoles"></small><br>
       <small class="muted">Ctrl + rueda (o botones +/−) = zoom · arrastrar = mover · doble clic = restablecer · líneas en el gráfico: Verde = Take Profit, Rojo = Stop Loss, Amarillo = Entrada/Estrategia</small>
     </section>

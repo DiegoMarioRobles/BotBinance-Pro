@@ -118,9 +118,9 @@ def create_app(engine, state, cfg, store) -> Flask:
         feed = engine.feed
         tf = request.args.get("tf", cfg.TF_GATILLO)
         if feed is None or tf not in CHART_TFS:
-            return jsonify({"series": None, "forming": None, "tfs": CHART_TFS})
+            return jsonify({"series": None, "forming": None, "tfs": CHART_TFS, "tf": tf})
         n = max(50, min(int(request.args.get("n", 300) or 300), 1000))
-        data = feed.chart_data(tf, n)
+        data = dict(feed.chart_data(tf, n))
         ev = state.evaluation or {}
         trade = state.trade
         ann: dict = {}
@@ -171,6 +171,18 @@ def create_app(engine, state, cfg, store) -> Flask:
         data["tfs"] = CHART_TFS
         data["tf"] = tf
         data["history"] = [h for h in state.history if h.get("close_time")][-30:]
+        role_desc = ""
+        if tf == cfg.TF_GATILLO:
+            role_desc = "Gatillo de entrada"
+        elif tf == cfg.TF_ZONA:
+            role_desc = "Zona de retroceso"
+        elif tf == cfg.TF_TENDENCIA:
+            role_desc = "Tendencia macro"
+        elif tf == getattr(cfg, "TF_TENDENCIA_SUPERIOR", ""):
+            role_desc = "Filtro superior"
+        elif tf == getattr(cfg, "TF_FIBONACCI", ""):
+            role_desc = "Fibonacci"
+        data["role_desc"] = role_desc
         return jsonify(data)
 
     # ------------------------------------------------------------------ configuración

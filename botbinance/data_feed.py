@@ -298,10 +298,13 @@ class DataFeed:
             return dict(self.frames)
 
     def chart_data(self, tf: str, n: int = 300) -> dict:
-        """Velas para el gráfico: de la memoria si la temporalidad es de la estrategia; si no, se piden por REST."""
+        """Velas para el gráfico: de la memoria si la temporalidad está cargada; si no, se piden por REST."""
         with self._lock:
             df = self.frames.get(tf)
             forming = self.forming.get(tf)
+            if (df is None or df.empty) and tf in self.raw and not self.raw[tf].empty:
+                df = enrich(self.raw[tf], self.cfg.BB_PERIODO, self.cfg.BB_DESVIACION)
+                self.frames[tf] = df
         if df is None or df.empty:
             return self._chart_on_demand(tf, n)
         last_open = int(df["open_time"].iloc[-1])
@@ -331,7 +334,7 @@ class DataFeed:
             if closed.empty:
                 return {"series": None, "forming": None}
             data = {"series": series_of(enrich(closed, self.cfg.BB_PERIODO, self.cfg.BB_DESVIACION), n), "forming": forming}
-        except (BinanceAPIError, NetworkError) as exc:
+        except Exception as exc:
             log.warning("Gráfico %s: no se pudieron pedir las velas (%s)", tf, exc)
             return hit[1] if hit else {"series": None, "forming": None}
         self._chart_cache[tf] = (time.time(), data)

@@ -18,6 +18,7 @@ const num = (x, nd = 2) => (x == null || isNaN(x)) ? "–" : Number(x).toLocaleS
 const signed = (x, nd = 2) => (x == null || isNaN(x)) ? "–" : (x >= 0 ? "+" : "") + num(x, nd);
 const clsSign = (x) => x > 0 ? "pos" : x < 0 ? "neg" : "";
 const hhmmss = (t) => new Date(t * 1000).toLocaleTimeString("es", { hour12: false });
+const CHART_TFS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "8h", "12h", "16h", "20h", "1d", "2d", "3d", "1w", "1M"];
 
 async function api(path, body) {
   const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-Token": TOKEN }, body: JSON.stringify(body) };
@@ -119,7 +120,7 @@ class Chart {
     const W = Math.max(300, r.width), H = Math.max(240, r.height);
     if (this.cv.width !== Math.round(W * dpr) || this.cv.height !== Math.round(H * dpr)) { this.cv.width = Math.round(W * dpr); this.cv.height = Math.round(H * dpr); }
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    return { W, H, L: 6, R: 66, T: 8, B: 22 };
+    return { W, H, L: 8, R: 68, T: 24, B: 28 };
   }
   range() { const i1 = this.n - this.offset; const i0 = Math.max(0, i1 - this.count); return [i0, i1]; }
   zoom(e) { this.zoomBy(e.deltaY > 0 ? 1.15 : 1 / 1.15, e.offsetX); }
@@ -150,6 +151,23 @@ class Chart {
     const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
     const yOf = (p) => g.T + (hi - p) / (hi - lo) * priceH;
     const text = css("--muted"), line = css("--line");
+
+    // Distintivo / Watermark de la temporalidad en la esquina superior izquierda
+    ctx.save();
+    ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = css("--text");
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    const tfUpper = (this.tf || "1h").toUpperCase();
+    const role = (this.d && this.d.role_desc) || (S && S.tf_roles && (
+      this.tf === S.tf_roles.gatillo ? "Gatillo de entrada" :
+      this.tf === S.tf_roles.zona ? "Zona de retroceso" :
+      this.tf === S.tf_roles.tendencia ? "Tendencia macro" :
+      this.tf === S.tf_roles.superior ? "Tendencia superior" : ""
+    )) || "";
+    ctx.fillText("BTC/USDT  ·  " + tfUpper + (role ? "  (" + role + ")" : ""), g.L + 8, 5);
+    ctx.restore();
+
     ctx.font = "11px Consolas, monospace"; ctx.textBaseline = "middle";
     // rejilla de precio
     const step = niceStep((hi - lo) / 6);
@@ -157,12 +175,24 @@ class Chart {
       const y = yOf(p); ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke();
       ctx.fillStyle = text; ctx.textAlign = "left"; ctx.fillText(num(p, step < 1 ? 2 : 0), g.W - g.R + 6, y);
     }
+    // separador de eje de tiempo
+    ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.L, g.H - g.B); ctx.lineTo(g.W - g.R, g.H - g.B); ctx.stroke();
     // eje de tiempo
-    ctx.textAlign = "center"; ctx.textBaseline = "top"; const every = Math.max(1, Math.round(90 / bw));
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; const every = Math.max(1, Math.round(95 / bw));
     for (let i = i0; i < i1; i += every) {
-      const dt = new Date(a.open_time[i]); const big = ["8h", "12h", "16h", "20h", "1d", "2d", "3d", "1w", "1M"].includes(this.tf);
-      const lab = big ? dt.toLocaleDateString("es", { day: "2-digit", month: "short" }) : dt.toLocaleString("es", { day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
-      ctx.fillStyle = text; ctx.fillText(lab, xOf(i), g.H - g.B + 5);
+      const dt = new Date(a.open_time[i]);
+      const tfCur = (this.tf || "").toLowerCase();
+      let lab;
+      if (["1w", "1m"].includes(tfCur)) {
+        lab = dt.toLocaleDateString("es", { day: "2-digit", month: "short", year: "2-digit" });
+      } else if (["1d", "2d", "3d"].includes(tfCur)) {
+        lab = dt.toLocaleDateString("es", { day: "2-digit", month: "short" });
+      } else if (["2h", "4h", "6h", "8h", "12h", "16h", "20h"].includes(tfCur)) {
+        lab = dt.toLocaleDateString("es", { day: "2-digit", month: "numeric" }) + " " + dt.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", hour12: false });
+      } else {
+        lab = dt.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", hour12: false });
+      }
+      ctx.fillStyle = text; ctx.fillText(lab, xOf(i), g.H - g.B + 7);
     }
     ctx.textBaseline = "middle";
     // zona Fibonacci
@@ -271,18 +301,69 @@ class Chart {
 function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; }
 const chart = new Chart($("chart"), $("tip"));
 $("zoomIn").onclick = () => chart.zoomBy(1 / 1.3); $("zoomOut").onclick = () => chart.zoomBy(1.3);
-let chartTf = null, lastCandleTf = null;
+let chartTf = null;
+try { chartTf = localStorage.getItem("bot_chart_tf") || null; } catch (e) {}
+let lastCandleTf = null;
+let currentChartReqId = 0;
 
-async function refreshChart() {
+function setChartLoading(loading, msg) {
+  const overlay = $("chartLoadingOverlay");
+  if (!overlay) return;
+  if (loading) {
+    if (msg) overlay.querySelector("span").textContent = msg;
+    overlay.classList.add("active");
+  } else {
+    overlay.classList.remove("active");
+  }
+}
+
+function syncTfUI(tf) {
+  const sel = $("tfSelect");
+  if (sel && sel.value !== tf) sel.value = tf;
+  const pills = document.querySelectorAll("#tfQuickPills button");
+  pills.forEach((b) => b.classList.toggle("on", b.dataset.tf === tf));
+}
+
+function setChartTimeframe(newTf) {
+  if (!newTf) return;
+  chartTf = newTf;
+  try { localStorage.setItem("bot_chart_tf", newTf); } catch (e) {}
+  syncTfUI(newTf);
+  refreshChart(true);
+}
+
+function initTfControls() {
+  const sel = $("tfSelect");
+  if (sel && !sel.options.length) {
+    CHART_TFS.forEach((t) => sel.append(h("option", { value: t, text: t })));
+    sel.addEventListener("change", () => setChartTimeframe(sel.value));
+  }
+  const pills = document.querySelectorAll("#tfQuickPills button");
+  pills.forEach((b) => {
+    b.addEventListener("click", () => setChartTimeframe(b.dataset.tf));
+  });
+  const current = chartTf || window.__triggerTf || "1h";
+  syncTfUI(current);
+}
+
+async function refreshChart(showLoading = false) {
+  const reqId = ++currentChartReqId;
+  const tf = chartTf || (window.__triggerTf || "1h");
+  if (showLoading) setChartLoading(true, "⌛ Cargando velas " + tf + "…");
   try {
-    const tf = chartTf || (window.__triggerTf || "1h");
     const d = await api("/api/candles?tf=" + tf + "&n=400");
-    if (!d) return;
-    const sel = $("tfSelect");
-    if (!sel.options.length) { CHART_TFS.forEach((t) => sel.append(h("option", { value: t, text: t }))); sel.onchange = () => { chartTf = sel.value; refreshChart(); }; }
-    if (document.activeElement !== sel) sel.value = d.tf || tf;
-    chart.tf = d.tf; const reset = lastCandleTf !== d.tf; lastCandleTf = d.tf; chart.setData(d, reset);
-  } catch (e) { /* reintenta en el siguiente ciclo */ }
+    if (!d || reqId !== currentChartReqId) return;
+    const resolvedTf = d.tf || tf;
+    chart.tf = resolvedTf;
+    syncTfUI(resolvedTf);
+    const reset = lastCandleTf !== resolvedTf;
+    lastCandleTf = resolvedTf;
+    chart.setData(d, reset);
+  } catch (e) {
+    if (showLoading) toast("No se pudieron cargar las velas de " + tf + ": reintentando…", "err");
+  } finally {
+    if (reqId === currentChartReqId) setChartLoading(false);
+  }
 }
 
 /* ------------------------------------------------------------------ render del estado */
@@ -308,6 +389,7 @@ function kv(box, rows) {
 
 function render(s) {
   S = s; window.__triggerTf = s.trigger_tf;
+  if (!chartTf) syncTfUI(s.trigger_tf || "1h");
   const r = s.tf_roles;
   $("ph1Title").textContent = "Fase 1 · Tendencia (" + [r.tendencia, r.superior].filter(Boolean).join(" + ") + ")";
   $("tfRoles").textContent = "Tendencia " + r.tendencia + (r.superior ? " + " + r.superior : "") + " · Retrocesos " + r.zona + " · Fibonacci " + r.fibonacci + " · Gatillo " + r.gatillo;
@@ -519,7 +601,7 @@ $("btnClose").onclick = async () => {
 const TREND = ["4h", "8h", "12h", "16h", "20h", "1d", "2d", "3d", "1w", "1M"];
 const PULL = ["5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"];
 const TRIG = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h"];
-const CHART_TFS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "8h", "12h", "16h", "20h", "1d", "2d", "3d", "1w", "1M"];
+
 const TFS = [
   ["TF_TENDENCIA", "Tendencia: ¿alcista o bajista?", TREND, "Temporalidad que decide si solo se compra o solo se vende."],
   ["TF_TENDENCIA_SUPERIOR", "Filtro de tendencia superior", [["", "(ninguno)"], ...TREND], "Opcional: una temporalidad mayor que también debe acompañar."],
@@ -973,7 +1055,7 @@ function drawEquity(cv, pts) {
 }
 
 /* ------------------------------------------------------------------ arranque */
-loadConfig(); poll(); refreshChart(); initParamTips();
+initTfControls(); loadConfig(); poll(); refreshChart(true); initParamTips();
 setInterval(poll, 2000); setInterval(refreshChart, 3000);
 
 
