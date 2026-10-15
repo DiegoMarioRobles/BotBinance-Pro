@@ -21,6 +21,10 @@
     <span id="chipTg" class="chip" title="Telegram">Telegram</span>
   </div>
   <div class="money-summary">
+    <div class="money-badge op-count-badge" id="mBadgeOpCount" title="Número de operaciones abiertas en curso">
+      <span class="m-lbl">Operaciones abiertas</span>
+      <b id="topOpCount" class="m-val">0</b>
+    </div>
     <div class="money-badge" title="Capital en cuenta (real o configurado)">
       <span class="m-lbl">Capital Total</span>
       <b id="topWallet" class="m-val">$100.00</b>
@@ -60,9 +64,15 @@
   <!-- Letrero llamativo de estado de la operación (Rojo = Sin Operación / Verde = Operación en Curso) -->
   <div id="opStatusBanner" class="op-status-banner idle">
     <div class="op-banner-main">
-      <div class="op-banner-badge" id="opBannerBadge">
-        <span class="op-banner-dot"></span>
-        <span id="opBannerBadgeText">SIN OPERACIÓN ACTIVA</span>
+      <div class="op-banner-badge-group">
+        <div class="op-banner-badge" id="opBannerBadge">
+          <span class="op-banner-dot"></span>
+          <span id="opBannerBadgeText">SIN OPERACIÓN ACTIVA</span>
+        </div>
+        <div class="op-banner-counter" id="opBannerCounter">
+          <span class="op-count-title">Operaciones abiertas:</span>
+          <b id="bannerOpCountNum" class="op-count-num">0</b>
+        </div>
       </div>
       <div class="op-banner-headline" id="opBannerHeadline">Monitoreando mercado en tiempo real · Buscando entrada según estrategia activa</div>
     </div>

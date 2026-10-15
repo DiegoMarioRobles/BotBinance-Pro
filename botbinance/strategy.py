@@ -49,9 +49,9 @@ class Signal:
 STRATEGIES = {
     "estrategia_1": {
         "id": "estrategia_1",
-        "name": "Estrategia 1 · Rebote en Sobreventa (RSI < 20 + Bollinger)",
-        "short_name": "Estrategia 1 (RSI < 20 + BB)",
-        "desc": "Tendencia en 1d/12h + Retroceso con RSI < 20 y vela tocando Banda Inferior de Bollinger en 15m/30m.",
+        "name": "Estrategia 1 · Rebote en Sobreventa (RSI Sobreventa + Bollinger)",
+        "short_name": "Estrategia 1 (RSI Sobreventa + BB)",
+        "desc": "Tendencia en 1d/12h + Retroceso con RSI en sobreventa y vela tocando Banda Inferior de Bollinger en 15m/30m.",
         "default_tfs": {"TF_TENDENCIA": "1d", "TF_TENDENCIA_SUPERIOR": "1w", "TF_ZONA": "15m", "TF_GATILLO": "15m"},
         "indicators": ["bb", "rsi", "strat"],
     },
@@ -267,7 +267,7 @@ def sr_markers(df: pd.DataFrame, price: float, cfg, cache: dict | None = None, l
 # Evaluación de Estrategias
 # ---------------------------------------------------------------------------
 def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | None = None, with_sr: bool = False) -> Evaluation:
-    """Estrategia 1 (Predeterminada): Tendencia 1d/12h + Rebote en RSI < 20 y toque de Banda Inferior de Bollinger en 15m/30m."""
+    """Estrategia 1 (Predeterminada): Tendencia 1d/12h + Rebote en RSI sobreventa y toque de Banda Inferior de Bollinger en 15m/30m."""
     strat_info = STRATEGIES["estrategia_1"]
     ev = Evaluation(strategy_id="estrategia_1", strategy_name=strat_info["name"])
     tft, tfu = cfg.TF_TENDENCIA, cfg.TF_TENDENCIA_SUPERIOR
@@ -330,7 +330,7 @@ def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | No
             "current_price": ev.price,
             "target_price": None,
             "current_rsi": float(t.rsi14) if hasattr(t, "rsi14") else None,
-            "target_rsi": 20.0,
+            "target_rsi": float(getattr(cfg, "RSI_SOBREVENTA", 35.0)),
             "dist_price": 0.0,
             "dist_rsi": 0.0,
             "trigger_tf": cfg.TF_GATILLO,
@@ -354,7 +354,7 @@ def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | No
             "current_price": ev.price,
             "target_price": None,
             "current_rsi": float(t.rsi14) if hasattr(t, "rsi14") else None,
-            "target_rsi": 20.0,
+            "target_rsi": float(getattr(cfg, "RSI_SOBREVENTA", 35.0)),
             "dist_price": 0.0,
             "dist_rsi": 0.0,
             "trigger_tf": cfg.TF_GATILLO,
@@ -362,20 +362,22 @@ def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | No
         return ev
 
     side = ev.trend
-    window = max(1, int(cfg.VENTANA_AGOTAMIENTO))
+    window = max(3, int(getattr(cfg, "VENTANA_AGOTAMIENTO", 3)))
+    rsi_ov = float(getattr(cfg, "RSI_SOBREVENTA", 35.0))
+    rsi_ob = float(getattr(cfg, "RSI_SOBRECOMPRA", 65.0))
 
-    # ---------------- FASE 2: retroceso con RSI < 20 (LONG) o > 80 (SHORT) ----------------
+    # ---------------- FASE 2: retroceso con RSI <= sobreventa (LONG) o >= sobrecompra (SHORT) ----------------
     recent_rsi = [float(trig.iloc[-1 - k].rsi14) for k in range(min(window, len(trig))) if not pd.isna(trig.iloc[-1 - k].rsi14)]
     if side == "LONG":
-        rsi_target = 20.0
-        rsi_hit = any(val < rsi_target for val in recent_rsi)
+        rsi_target = rsi_ov
+        rsi_hit = any(val <= rsi_target for val in recent_rsi)
         rsi_val_str = f"{float(t.rsi14):.1f} (mínimo reciente: {min(recent_rsi):.1f})" if recent_rsi else "n/d"
-        phase2_name = f"{cfg.TF_GATILLO} · RSI(14) en sobreventa (< 20)"
+        phase2_name = f"{cfg.TF_GATILLO} · RSI(14) en sobreventa (≤ {rsi_target:g})"
     else:
-        rsi_target = 80.0
-        rsi_hit = any(val > rsi_target for val in recent_rsi)
+        rsi_target = rsi_ob
+        rsi_hit = any(val >= rsi_target for val in recent_rsi)
         rsi_val_str = f"{float(t.rsi14):.1f} (máximo reciente: {max(recent_rsi):.1f})" if recent_rsi else "n/d"
-        phase2_name = f"{cfg.TF_GATILLO} · RSI(14) en sobrecompra (> 80)"
+        phase2_name = f"{cfg.TF_GATILLO} · RSI(14) en sobrecompra (≥ {rsi_target:g})"
 
     ev.phase2 = [Check(phase2_name, rsi_val_str, ok=rsi_hit)]
     ev.phase2_ok = rsi_hit
@@ -399,15 +401,22 @@ def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | No
     dist_rsi = float(t.rsi14) - rsi_target
     if side == "LONG":
         if ev.phase2_ok and ev.phase3_ok:
-            status_msg = f"🟢 ¡CONDICIÓN DE COMPRA CUMPLIDA! RSI({cfg.TF_GATILLO})={t.rsi14:.1f} < 20 y precio tocó Banda Inferior (${target_price:,.1f})."
+            status_msg = f"🟢 ¡CONDICIÓN DE COMPRA CUMPLIDA! RSI({cfg.TF_GATILLO})={t.rsi14:.1f} ≤ {rsi_target:g} y precio tocó Banda Inferior (${target_price:,.1f})."
         elif ev.phase3_ok and not ev.phase2_ok:
-            status_msg = f"🟡 Precio tocó Banda Inferior (${target_price:,.1f}), esperando que RSI({cfg.TF_GATILLO}) baje a < 20.0 (actual: {t.rsi14:.1f}, faltan {dist_rsi:.1f} pts)."
+            status_msg = f"🟡 Precio tocó Banda Inferior (${target_price:,.1f}), esperando que RSI({cfg.TF_GATILLO}) baje a ≤ {rsi_target:g} (actual: {t.rsi14:.1f}, faltan {dist_rsi:.1f} pts)."
         elif ev.phase2_ok and not ev.phase3_ok:
-            status_msg = f"🟡 RSI({cfg.TF_GATILLO}) en sobreventa (< 20.0), esperando que el precio baje a Banda Inferior (${target_price:,.1f}, faltan ${dist_price:,.1f})."
+            status_msg = f"🟡 RSI({cfg.TF_GATILLO}) en sobreventa (≤ {rsi_target:g}), esperando que el precio baje a Banda Inferior (${target_price:,.1f}, faltan ${dist_price:,.1f})."
         else:
-            status_msg = f"⚪ Esperando retroceso alcista: Precio debe bajar a Banda Inferior (${target_price:,.1f}, dist: ${dist_price:,.1f}) y RSI({cfg.TF_GATILLO}) caer a < 20 (actual: {t.rsi14:.1f})."
+            status_msg = f"⚪ Esperando retroceso alcista: Precio debe bajar a Banda Inferior (${target_price:,.1f}, dist: ${dist_price:,.1f}) y RSI({cfg.TF_GATILLO}) caer a ≤ {rsi_target:g} (actual: {t.rsi14:.1f})."
     else:
-        status_msg = f"⚪ Esperando retroceso bajista: Precio debe subir a Banda Superior (${target_price:,.1f}) y RSI({cfg.TF_GATILLO}) subir a > 80 (actual: {t.rsi14:.1f})."
+        if ev.phase2_ok and ev.phase3_ok:
+            status_msg = f"🟢 ¡CONDICIÓN DE VENTA CUMPLIDA! RSI({cfg.TF_GATILLO})={t.rsi14:.1f} ≥ {rsi_target:g} y precio tocó Banda Superior (${target_price:,.1f})."
+        elif ev.phase3_ok and not ev.phase2_ok:
+            status_msg = f"🟡 Precio tocó Banda Superior (${target_price:,.1f}), esperando que RSI({cfg.TF_GATILLO}) suba a ≥ {rsi_target:g} (actual: {t.rsi14:.1f}, faltan {abs(dist_rsi):.1f} pts)."
+        elif ev.phase2_ok and not ev.phase3_ok:
+            status_msg = f"🟡 RSI({cfg.TF_GATILLO}) en sobrecompra (≥ {rsi_target:g}), esperando que el precio suba a Banda Superior (${target_price:,.1f}, faltan ${abs(dist_price):.1f})."
+        else:
+            status_msg = f"⚪ Esperando retroceso bajista: Precio debe subir a Banda Superior (${target_price:,.1f}) y RSI({cfg.TF_GATILLO}) subir a ≥ {rsi_target:g} (actual: {t.rsi14:.1f})."
 
     ev.execution_points = {
         "strategy_id": "estrategia_1",
@@ -426,7 +435,7 @@ def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | No
     }
 
     if ev.phase1_ok and ev.phase2_ok and ev.phase3_ok:
-        pattern_name = "Rebote en RSI < 20 + Bollinger Inf" if side == "LONG" else "Rechazo en RSI > 80 + Bollinger Sup"
+        pattern_name = f"Rebote en RSI ≤ {rsi_target:g} + Bollinger Inf" if side == "LONG" else f"Rechazo en RSI ≥ {rsi_target:g} + Bollinger Sup"
         ev.signal = Signal(
             side=side, pattern=pattern_name,
             exhaustion=f"RSI={t.rsi14:.1f} · BB={target_price:,.1f}",
@@ -438,9 +447,9 @@ def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | No
     elif not ev.phase2_ok and not ev.phase3_ok:
         ev.note = f"Tendencia {side} confirmada; esperando retroceso con RSI extremo y toque de Bollinger."
     elif not ev.phase2_ok:
-        ev.note = f"Tocó Bollinger; esperando RSI < 20."
+        ev.note = f"Tocó Bollinger; esperando RSI ≤ {rsi_target:g}."
     else:
-        ev.note = f"RSI < 20; esperando toque de Banda de Bollinger."
+        ev.note = f"RSI ≤ {rsi_target:g}; esperando toque de Banda de Bollinger."
 
     return ev
 

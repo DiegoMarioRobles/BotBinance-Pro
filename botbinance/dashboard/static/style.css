@@ -39,6 +39,10 @@ code { background: var(--panel2); padding: 2px 6px; border-radius: 5px; }
 .money-badge.risk { border-color: rgba(239,83,80,0.35); }
 .money-badge.profit { border-color: rgba(38,166,154,0.35); }
 .money-badge.highlight { border-color: var(--accent); }
+.money-badge.op-count-badge { border-color: rgba(239,83,80,0.4); background: rgba(239,83,80,0.06); transition: all .25s ease; }
+.money-badge.op-count-badge.active { border-color: #10b981; background: rgba(16,185,129,0.15); box-shadow: 0 0 14px rgba(16,185,129,0.35); }
+.money-badge.op-count-badge.active .m-val { color: #10b981; }
+.money-badge.op-count-badge.idle .m-val { color: #ef5350; }
 .price { text-align: right; } .price span { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; } .price small { display: block; font-size: 11px; }
 .actions { display: flex; gap: 8px; }
 
@@ -127,6 +131,48 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+.op-banner-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.op-banner-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  letter-spacing: .02em;
+}
+.op-status-banner.idle .op-banner-counter {
+  color: #ffcdd2;
+  border-color: rgba(239, 83, 80, 0.4);
+}
+.op-status-banner.active .op-banner-counter {
+  color: #d1fae5;
+  border-color: rgba(16, 185, 129, 0.6);
+  background: rgba(16, 185, 129, 0.22);
+}
+.op-banner-counter .op-count-num {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 7px;
+  border-radius: 4px;
+}
+.op-status-banner.idle .op-banner-counter .op-count-num {
+  background: rgba(239, 83, 80, 0.35);
+  color: #fff;
+}
+.op-status-banner.active .op-banner-counter .op-count-num {
+  background: #10b981;
+  color: #0f1419;
 }
 .op-banner-badge {
   display: inline-flex;

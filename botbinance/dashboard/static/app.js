@@ -362,25 +362,30 @@ class Chart {
       ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.L, rsiTopY - 4); ctx.lineTo(g.W - g.R, rsiTopY - 4); ctx.stroke();
 
       // Zona sombreada entre nivel 20 y 80
-      ctx.fillStyle = "rgba(179, 136, 255, 0.05)";
-      ctx.fillRect(g.L, yRsi(80), pw, yRsi(20) - yRsi(80));
+      // Subpanel de RSI (14) con umbrales configurables y búsqueda del último valor válido
+      const rsiOversold = (S && S.config && Number(S.config.RSI_SOBREVENTA)) || 35;
+      const rsiOverbought = (S && S.config && Number(S.config.RSI_SOBRECOMPRA)) || 65;
 
-      // Nivel 80 (Sobrecompra)
+      // Zona sombreada entre nivel sobreventa y sobrecompra
+      ctx.fillStyle = "rgba(179, 136, 255, 0.05)";
+      ctx.fillRect(g.L, yRsi(rsiOverbought), pw, yRsi(rsiOversold) - yRsi(rsiOverbought));
+
+      // Nivel Sobrecompra
       ctx.strokeStyle = "rgba(239, 83, 80, 0.65)"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(g.L, yRsi(80)); ctx.lineTo(g.W - g.R, yRsi(80)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(g.L, yRsi(rsiOverbought)); ctx.lineTo(g.W - g.R, yRsi(rsiOverbought)); ctx.stroke();
       ctx.fillStyle = css("--down"); ctx.font = "9.5px Consolas, monospace"; ctx.textAlign = "left";
-      ctx.fillText("80 Sobrecompra", g.W - g.R + 4, yRsi(80));
+      ctx.fillText(rsiOverbought + " Sobrecompra", g.W - g.R + 4, yRsi(rsiOverbought));
 
       // Nivel 50 (Centro)
       ctx.strokeStyle = "rgba(139, 152, 169, 0.3)"; ctx.setLineDash([2, 4]);
       ctx.beginPath(); ctx.moveTo(g.L, yRsi(50)); ctx.lineTo(g.W - g.R, yRsi(50)); ctx.stroke();
       ctx.fillStyle = text; ctx.fillText("50", g.W - g.R + 4, yRsi(50));
 
-      // Nivel 20 (Sobreventa - Condición Gatillo de Estrategia 1)
+      // Nivel Sobreventa (Gatillo)
       ctx.strokeStyle = "rgba(38, 166, 154, 0.85)"; ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(g.L, yRsi(20)); ctx.lineTo(g.W - g.R, yRsi(20)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(g.L, yRsi(rsiOversold)); ctx.lineTo(g.W - g.R, yRsi(rsiOversold)); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = css("--up"); ctx.font = "bold 9.5px Consolas, monospace";
-      ctx.fillText("20 Sobreventa", g.W - g.R + 4, yRsi(20));
+      ctx.fillText(rsiOversold + " Sobreventa (Gatillo)", g.W - g.R + 4, yRsi(rsiOversold));
 
       // Curva del oscilador RSI (14)
       ctx.strokeStyle = "#b388ff"; ctx.lineWidth = 1.8; ctx.beginPath();
@@ -394,27 +399,33 @@ class Chart {
       }
       ctx.stroke();
 
-      // Puntos destacados cuando RSI < 20 (Gatillo)
+      // Puntos destacados cuando RSI <= rsiOversold (Gatillo)
       ctx.fillStyle = css("--up");
       for (let i = i0; i < i1; i++) {
         const val = a.rsi14[i];
-        if (val != null && val < 20) {
+        if (val != null && val <= rsiOversold) {
           const x = xOf(i), y = yRsi(val);
           ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      // Encabezado del oscilador con valor actual
-      const lastRsi = a.rsi14[this.n - 1];
+      // Encabezado del oscilador con valor actual (búsqueda hacia atrás del último valor numérico válido)
+      let lastRsi = null;
+      for (let k = this.n - 1; k >= 0; k--) {
+        if (a.rsi14[k] != null && !isNaN(a.rsi14[k])) {
+          lastRsi = a.rsi14[k];
+          break;
+        }
+      }
       ctx.font = "bold 11px system-ui, sans-serif";
       ctx.textAlign = "left"; ctx.textBaseline = "bottom";
       let rsiTxt = "RSI (14): " + (lastRsi != null ? lastRsi.toFixed(1) : "–");
-      if (lastRsi != null && lastRsi < 20) {
+      if (lastRsi != null && lastRsi <= rsiOversold) {
         ctx.fillStyle = css("--up");
-        rsiTxt += "  ⚡ SOBREVENTA < 20 (Condición Gatillo cumplida)";
-      } else if (lastRsi != null && lastRsi > 80) {
+        rsiTxt += "  ⚡ SOBREVENTA ≤ " + rsiOversold + " (Condición Gatillo cumplida)";
+      } else if (lastRsi != null && lastRsi >= rsiOverbought) {
         ctx.fillStyle = css("--down");
-        rsiTxt += "  ⚠ SOBRECOMPRA > 80";
+        rsiTxt += "  ⚠ SOBRECOMPRA ≥ " + rsiOverbought;
       } else {
         ctx.fillStyle = "#b388ff";
       }
@@ -555,7 +566,19 @@ function render(s) {
   $("price").textContent = s.price ? usd(s.price) : "–"; $("priceAge").textContent = s.price_age != null ? "hace " + Math.round(s.price_age) + " s" : "";
   $("btnPause").hidden = s.paused; $("btnResume").hidden = !s.paused;
 
-  // resumen financiero en encabezado
+  // resumen financiero y estado de operaciones en encabezado
+  const openCount = (s.trade ? 1 : 0) + (s.position ? 1 : 0);
+  const topOpBadge = $("mBadgeOpCount");
+  const topOpCount = $("topOpCount");
+  if (topOpCount) topOpCount.textContent = String(openCount);
+  if (topOpBadge) {
+    topOpBadge.classList.toggle("active", openCount > 0);
+    topOpBadge.classList.toggle("idle", openCount === 0);
+    topOpBadge.title = openCount > 0 ? "¡Hay " + openCount + " operación abierta en curso!" : "Sin operaciones abiertas actualmente";
+  }
+  const bannerOpCount = $("bannerOpCountNum");
+  if (bannerOpCount) bannerOpCount.textContent = String(openCount);
+
   const fin = s.financials || {};
   const walletAmt = s.balance && s.balance.wallet != null ? s.balance.wallet : (fin.capital_config || 100);
   const topW = $("topWallet"); if (topW) topW.textContent = usd(walletAmt, 2);
@@ -628,7 +651,7 @@ function render(s) {
     if (epP) epP.textContent = ep.current_price ? usd(ep.current_price, 1) : "–";
     if (epTP) epTP.textContent = ep.target_price ? usd(ep.target_price, 1) : "–";
     if (epR) epR.textContent = ep.current_rsi != null ? num(ep.current_rsi, 1) : "–";
-    if (epTR) epTR.textContent = ep.target_rsi != null ? (ep.side === "LONG" ? "< " : "> ") + ep.target_rsi : "–";
+    if (epTR) epTR.textContent = ep.target_rsi != null ? (ep.side === "LONG" ? "≤ " : "≥ ") + ep.target_rsi : "–";
     if (epMsg) {
       epMsg.textContent = ep.message || "Evaluando condiciones…";
       epMsg.className = "exec-msg" + (ep.target_reached ? " reached" : "");
@@ -655,6 +678,7 @@ function render(s) {
       banner.className = "op-status-banner active";
       bBadgeText.textContent = "OPERACIÓN EN CURSO · " + tr.side + " " + (s.symbol || "BTC/USDT") + " (" + (tr.leverage || fin.leverage || 5) + "x)";
       bHeadline.textContent = "Patrón: " + (tr.pattern || "Estrategia") + (tr.be_done ? " · Break-even activo (SL en entrada)" : "");
+      if (bannerOpCount) bannerOpCount.textContent = String(openCount);
       if (bAction) bAction.hidden = false;
       bMetrics.append(makePill("Entrada", usd(tr.entry, 1)));
       bMetrics.append(makePill("Precio Marca", usd(tr.mark || s.price, 1)));
@@ -666,6 +690,7 @@ function render(s) {
       banner.className = "op-status-banner active";
       bBadgeText.textContent = "POSICIÓN EXTERNA ACTIVA · " + num(s.position.amt, 4) + " BTC";
       bHeadline.textContent = "Posición detectada en la cuenta de Binance ajena al bot";
+      if (bannerOpCount) bannerOpCount.textContent = String(openCount);
       if (bAction) bAction.hidden = false;
       bMetrics.append(makePill("Entrada", usd(s.position.entry, 1)));
       bMetrics.append(makePill("Precio Marca", usd(s.price, 1)));
@@ -673,6 +698,7 @@ function render(s) {
     } else {
       banner.className = "op-status-banner idle";
       bBadgeText.textContent = "SIN OPERACIÓN ACTIVA";
+      if (bannerOpCount) bannerOpCount.textContent = "0";
       const stratName = s.strategy_info ? (s.strategy_info.short_name || s.strategy_info.name) : "Estrategia";
       bHeadline.textContent = "Monitoreando mercado en tiempo real · Buscando señal de entrada según " + stratName;
       if (bAction) bAction.hidden = true;
@@ -681,8 +707,9 @@ function render(s) {
         bMetrics.append(makePill("Gatillo Precio (BB Inf)", usd(ep.target_price, 1)));
       }
       if (ep && ep.current_rsi != null) {
-        const rsiTarget = ep.target_rsi != null ? "< " + ep.target_rsi : "< 20";
-        bMetrics.append(makePill("RSI Actual", num(ep.current_rsi, 1) + " (Gatillo " + rsiTarget + ")", ep.current_rsi < 20 ? "pos" : ""));
+        const rsiOv = (s.config && Number(s.config.RSI_SOBREVENTA)) || 35;
+        const rsiTarget = ep.target_rsi != null ? "≤ " + ep.target_rsi : "≤ " + rsiOv;
+        bMetrics.append(makePill("RSI Actual", num(ep.current_rsi, 1) + " (Gatillo " + rsiTarget + ")", ep.current_rsi <= rsiOv ? "pos" : ""));
       }
       const phState = ev.phase3_ok ? "Fase 3: Gatillo cumplido ✔" : (ev.phase2_ok ? "Fase 2 cumplida · Esperando gatillo" : (ev.phase1_ok ? "Fase 1: Tendencia confirmada" : "Fase 1: Evaluando tendencia"));
       bMetrics.append(makePill("Estado Fases", phState));
@@ -1049,7 +1076,7 @@ fillSel("btZona", [CFG, ...PULL.map((t) => [t, t])]); fillSel("btGatillo", [CFG,
 const PARAM_EXPLANATIONS = {
   btStrat: {
     title: "Estrategia a simular",
-    desc: "Define qué reglas matemáticas e indicadores se evalúan para generar entradas (ej. Estrategia 1: Tendencia 12h/1d + retroceso RSI < 20 y toque de Banda Bollinger inferior en 15m/30m para compra alcista)."
+    desc: "Define qué reglas matemáticas e indicadores se evalúan para generar entradas (ej. Estrategia 1: Tendencia 12h/1d + retroceso RSI en sobreventa y toque de Banda Bollinger inferior en 15m/30m para compra alcista)."
   },
   btDesde: {
     title: "Fecha Desde",

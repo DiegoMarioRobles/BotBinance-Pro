@@ -139,6 +139,28 @@ def test_estrategia_1_signal(cfg):
     assert ev.signal.side == "LONG"
     assert ev.execution_points is not None
     assert ev.execution_points["target_reached"] is True
+def test_estrategia_1_oversold_bounce_with_rsi34(cfg):
+    """Verifica que un rebote como el de la captura (RSI ~34.5 <= 35.0 y toque de Banda Inferior) activa la señal."""
+    cfg.ESTRATEGIA = "estrategia_1"
+    cfg.RSI_SOBREVENTA = 35.0
+    frames = make_frames(cfg)
+    trig = frames[cfg.TF_GATILLO]
+    z = frames[cfg.TF_ZONA].iloc[-1]
+    price = float(z.ema20)
+    t = trig.copy()
+    i = t.index[-1]
+    # Vela tocando banda inferior con RSI en 34.5 (sobreventa según config)
+    t.loc[i, ["open", "close", "high", "low"]] = [price, price + 0.5, price + 1.0, price - 6.0]
+    t.loc[i, ["bb_low"]] = price - 5.0
+    t.loc[i, ["rsi14"]] = 34.5
+    frames[cfg.TF_GATILLO] = t
+    ev = strategy.evaluate(frames, cfg, {})
+    assert ev.trend == "LONG"
+    assert ev.phase2_ok is True
+    assert ev.phase3_ok is True
+    assert ev.signal is not None
+    assert ev.signal.side == "LONG"
+    assert ev.execution_points["target_reached"] is True
 
 
 
