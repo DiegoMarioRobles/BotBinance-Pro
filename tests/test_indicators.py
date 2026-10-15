@@ -52,3 +52,29 @@ def test_bollinger_uses_population_std():
     mid, up, low = I.bollinger(x, 5, 2.0)
     assert mid[-1] == 3.0
     assert abs(up[-1] - (3.0 + 2.0 * np.sqrt(2.0))) < 1e-12     # ddof=0 -> sigma = sqrt(2)
+
+
+def test_enrich_with_custom_parameters():
+    rng = np.random.default_rng(42)
+    closes = 100 + np.cumsum(rng.normal(0, 1, 300))
+    df = candles(closes)
+
+    # Custom periods
+    enriched_custom = I.enrich(
+        df,
+        bb_period=10,
+        bb_dev=2.5,
+        rsi_period=7,
+        ema_fast=12,
+        ema_slow=26,
+        sma_trend=100,
+        atr_period=10,
+    )
+    enriched_default = I.enrich(df)
+
+    # Check that custom calculation differs from default as expected
+    assert not np.isclose(enriched_custom["rsi14"].iloc[-1], enriched_default["rsi14"].iloc[-1])
+    assert not np.isclose(enriched_custom["bb_up"].iloc[-1], enriched_default["bb_up"].iloc[-1])
+    assert not np.isclose(enriched_custom["ema20"].iloc[-1], enriched_default["ema20"].iloc[-1])
+    assert not np.isclose(enriched_custom["ema50"].iloc[-1], enriched_default["ema50"].iloc[-1])
+    assert not np.isclose(enriched_custom["atr14"].iloc[-1], enriched_default["atr14"].iloc[-1])

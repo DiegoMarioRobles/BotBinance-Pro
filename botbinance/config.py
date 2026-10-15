@@ -60,11 +60,16 @@ class Settings:
     SHORT_RSI_DIARIO_MIN: float = 45.0
     SHORT_RSI_DIARIO_MAX: float = 60.0
 
-    # ---------------- Fase 3: gatillo ----------------
+    # ---------------- Fase 3: gatillo e indicadores configurables ----------------
     BB_PERIODO: int = 20
     BB_DESVIACION: float = 2.0
+    RSI_PERIODO: int = 14
     RSI_SOBREVENTA: float = 35.0
     RSI_SOBRECOMPRA: float = 65.0
+    EMA_RAPIDA: int = 20
+    EMA_LENTA: int = 50
+    SMA_TENDENCIA: int = 200
+    ATR_PERIODO: int = 14
     STOCH_SOBREVENTA: float = 20.0
     STOCH_SOBRECOMPRA: float = 80.0
     VENTANA_AGOTAMIENTO: int = 1                 # 1 = el agotamiento debe darse en la vela gatillo
@@ -188,6 +193,18 @@ class Settings:
             e.append("VENTANA_AGOTAMIENTO debe ser >= 1.")
         if not (1024 <= int(self.DASHBOARD_PORT) <= 65535):
             e.append("DASHBOARD_PORT debe estar entre 1024 y 65535.")
+        if self.BB_PERIODO < 2:
+            e.append("BB_PERIODO debe ser >= 2.")
+        if self.BB_DESVIACION <= 0:
+            e.append("BB_DESVIACION debe ser > 0.")
+        if self.RSI_PERIODO < 2:
+            e.append("RSI_PERIODO debe ser >= 2.")
+        if not (0 < self.RSI_SOBREVENTA < self.RSI_SOBRECOMPRA < 100):
+            e.append("Se requiere 0 < RSI_SOBREVENTA < RSI_SOBRECOMPRA < 100.")
+        if self.EMA_RAPIDA < 2 or self.EMA_LENTA < 2 or self.SMA_TENDENCIA < 2:
+            e.append("Los períodos de medias móviles deben ser >= 2.")
+        if self.ATR_PERIODO < 2:
+            e.append("ATR_PERIODO debe ser >= 2.")
         if self.ESTRATEGIA not in ("estrategia_1", "estrategia_2", "estrategia_3", "estrategia_4", "estrategia_5"):
             e.append("ESTRATEGIA debe ser una de: estrategia_1, estrategia_2, estrategia_3, estrategia_4, estrategia_5.")
         return e

@@ -21,8 +21,11 @@ from .util import fmt_ts, last_closed_open_time, now_ms, read_json, write_json
 log = logging.getLogger("botbinance.engine")
 
 CRITICAL_KEYS = {"SANDBOX_MODE", "SYMBOL", "ENTORNO_PRUEBAS_URL"}
-FEED_KEYS = {"TF_TENDENCIA", "TF_TENDENCIA_SUPERIOR", "TF_ZONA", "TF_GATILLO", "TF_FIBONACCI", "SYMBOL",
-             "BB_PERIODO", "BB_DESVIACION", "ESTRATEGIA"}
+FEED_KEYS = {"TF_TENDENCIA", "TF_TENDENCIA_SUPERIOR", "TF_ZONA", "TF_GATILLO", "TF_FIBONACCI", "SYMBOL"}
+INDICATOR_KEYS = {
+    "BB_PERIODO", "BB_DESVIACION", "RSI_PERIODO", "EMA_RAPIDA", "EMA_LENTA",
+    "SMA_TENDENCIA", "ATR_PERIODO"
+}
 
 
 class Engine:
@@ -445,6 +448,10 @@ class Engine:
         if changed & FEED_KEYS:
             warnings.append("Se cambió una temporalidad: recargo el historial de datos.")
             threading.Thread(target=self._restart_feed, daemon=True).start()
+        elif changed & INDICATOR_KEYS:
+            if self.feed:
+                self.feed.re_enrich_all()
+            warnings.append("Indicadores recalculados con los nuevos parámetros.")
         if changed & {"TELEGRAM_ACTIVO"}:
             self.notifier.reload_token()
         self._cache.clear()

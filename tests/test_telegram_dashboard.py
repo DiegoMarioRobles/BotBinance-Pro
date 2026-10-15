@@ -173,3 +173,40 @@ def test_resume_refused_with_fatal_config_error(app_env):
     state.fatal = "Configuración inválida: x"
     r = client.post("/api/resume", headers={**H, "X-Token": token}, json={})
     assert r.status_code == 400
+
+
+def test_config_indicator_parameters_and_state(app_env):
+    client, token, eng, state = app_env
+    hdr = {**H, "X-Token": token}
+
+    st = client.get("/api/state", headers=H).get_json()
+    assert "indicators" in st
+    assert st["indicators"]["rsi_period"] == 14
+    assert st["indicators"]["rsi_oversold"] == 35.0
+
+    r = client.post("/api/config", headers=hdr, json={"values": {
+        "RSI_PERIODO": 10,
+        "RSI_SOBREVENTA": 20.0,
+        "RSI_SOBRECOMPRA": 75.0,
+        "BB_PERIODO": 25,
+        "BB_DESVIACION": 2.2,
+        "EMA_RAPIDA": 15,
+        "EMA_LENTA": 45,
+        "SMA_TENDENCIA": 180,
+        "ATR_PERIODO": 10,
+    }})
+    assert r.status_code == 200
+    assert eng.cfg.RSI_PERIODO == 10
+    assert eng.cfg.RSI_SOBREVENTA == 20.0
+    assert eng.cfg.RSI_SOBRECOMPRA == 75.0
+    assert eng.cfg.BB_PERIODO == 25
+    assert eng.cfg.BB_DESVIACION == 2.2
+    assert eng.cfg.EMA_RAPIDA == 15
+    assert eng.cfg.EMA_LENTA == 45
+    assert eng.cfg.SMA_TENDENCIA == 180
+    assert eng.cfg.ATR_PERIODO == 10
+
+    st2 = client.get("/api/state", headers=H).get_json()
+    assert st2["indicators"]["rsi_period"] == 10
+    assert st2["indicators"]["rsi_oversold"] == 20.0
+

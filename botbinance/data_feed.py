@@ -121,11 +121,32 @@ class DataFeed:
             register_anchor(tf, int(df["open_time"].iloc[-1]))
         return df
 
+    def _enrich_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        return enrich(
+            df,
+            bb_period=int(getattr(self.cfg, "BB_PERIODO", 20)),
+            bb_dev=float(getattr(self.cfg, "BB_DESVIACION", 2.0)),
+            rsi_period=int(getattr(self.cfg, "RSI_PERIODO", 14)),
+            ema_fast=int(getattr(self.cfg, "EMA_RAPIDA", 20)),
+            ema_slow=int(getattr(self.cfg, "EMA_LENTA", 50)),
+            sma_trend=int(getattr(self.cfg, "SMA_TENDENCIA", 200)),
+            atr_period=int(getattr(self.cfg, "ATR_PERIODO", 14)),
+        )
+
+    def re_enrich_all(self) -> None:
+        """Recalcula todos los indicadores en los marcos temporales almacenados."""
+        with self._lock:
+            self._chart_cache.clear()
+            for tf, df_raw in list(self.raw.items()):
+                if df_raw is not None and not df_raw.empty:
+                    self.frames[tf] = self._enrich_df(df_raw)
+        log.info("Indicadores recalculados para todas las temporalidades con nueva configuración.")
+
     def _store(self, tf: str, df: pd.DataFrame) -> None:
         with self._lock:
             self.raw[tf] = df.tail(MAXROWS).reset_index(drop=True)
             if tf in self.timeframes:
-                self.frames[tf] = enrich(self.raw[tf], self.cfg.BB_PERIODO, self.cfg.BB_DESVIACION)
+                self.frames[tf] = self._enrich_df(self.raw[tf])
 
     def warmup(self) -> None:
         for tf in self.native_tfs:
@@ -309,7 +330,7 @@ class DataFeed:
             df = self.frames.get(tf)
             forming = self.forming.get(tf)
             if (df is None or df.empty) and tf in self.raw and not self.raw[tf].empty:
-                df = enrich(self.raw[tf], self.cfg.BB_PERIODO, self.cfg.BB_DESVIACION)
+                df = self._enrich_df(self.raw[tf])
                 self.frames[tf] = df
         if df is None or df.empty:
             return self._chart_on_demand(tf, n)
@@ -339,7 +360,7 @@ class DataFeed:
                     forming["open_time"] = int(forming["open_time"])
             if closed.empty:
                 return {"series": None, "forming": None}
-            data = {"series": series_of(enrich(closed, self.cfg.BB_PERIODO, self.cfg.BB_DESVIACION), n), "forming": forming}
+            data = {"series": series_of(self._enrich_df(closed), n), "forming": forming}
         except Exception as exc:
             log.warning("Gráfico %s: no se pudieron pedir las velas (%s)", tf, exc)
             return hit[1] if hit else {"series": None, "forming": None}

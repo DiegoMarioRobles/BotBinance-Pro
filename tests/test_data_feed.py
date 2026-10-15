@@ -109,3 +109,18 @@ def test_series_of_includes_bb_mid_and_rsi14():
     assert len(series["rsi14"]) == 30
     assert len(series["bb_mid"]) == 30
 
+
+def test_re_enrich_all_updates_indicators_with_new_config():
+    feed, _, _ = make_feed(80)
+    old_rsi = feed.frames["1h"]["rsi14"].copy()
+    old_bb = feed.frames["1h"]["bb_up"].copy()
+    feed.cfg.RSI_PERIODO = 7
+    feed.cfg.BB_PERIODO = 10
+    feed.cfg.BB_DESVIACION = 2.5
+    feed.re_enrich_all()
+    new_rsi = feed.frames["1h"]["rsi14"]
+    new_bb = feed.frames["1h"]["bb_up"]
+    assert len(new_rsi.dropna()) > len(old_rsi.dropna())
+    assert not (old_bb.dropna() == new_bb.dropna().loc[old_bb.dropna().index]).all()
+
+

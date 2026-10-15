@@ -144,15 +144,16 @@
       </div>
       <div class="ind-bar">
         <span class="muted" style="font-size: 11.5px; align-self: center; margin-right: 4px;">Indicadores y Estrategia:</span>
-        <button type="button" class="ind-pill" data-ind="ema20"><span class="ind-dot l20"></span>EMA 20</button>
-        <button type="button" class="ind-pill" data-ind="ema50"><span class="ind-dot l50"></span>EMA 50</button>
-        <button type="button" class="ind-pill" data-ind="sma200"><span class="ind-dot l200"></span>SMA 200</button>
-        <button type="button" class="ind-pill on" data-ind="bb"><span class="ind-dot lbb"></span>Bollinger</button>
-        <button type="button" class="ind-pill on" data-ind="rsi"><span class="ind-dot lrsi"></span>RSI (14)</button>
+        <button type="button" class="ind-pill" data-ind="ema20" id="pillEma20"><span class="ind-dot l20"></span><span id="lblEma20">EMA 20</span></button>
+        <button type="button" class="ind-pill" data-ind="ema50" id="pillEma50"><span class="ind-dot l50"></span><span id="lblEma50">EMA 50</span></button>
+        <button type="button" class="ind-pill" data-ind="sma200" id="pillSma200"><span class="ind-dot l200"></span><span id="lblSma200">SMA 200</span></button>
+        <button type="button" class="ind-pill on" data-ind="bb" id="pillBb"><span class="ind-dot lbb"></span><span id="lblBb">Bollinger</span></button>
+        <button type="button" class="ind-pill on" data-ind="rsi" id="pillRsi"><span class="ind-dot lrsi"></span><span id="lblRsi">RSI (14)</span></button>
         <button type="button" class="ind-pill" data-ind="sr"><span class="ind-dot lsr"></span>Soportes/Res</button>
         <button type="button" class="ind-pill" data-ind="fib"><span class="ind-dot lfib"></span>Fibonacci</button>
         <button type="button" class="ind-pill on" data-ind="strat"><span class="ind-dot lstrat"></span>Estrategia (SL/TP)</button>
-        <button type="button" id="btnSyncStratInds" class="btn small" style="margin-left: auto; padding: 2px 9px; font-size: 11px;" title="Activar exclusivamente los indicadores de la estrategia activa">🎯 Auto: Indicadores de estrategia</button>
+        <button type="button" id="btnOpenIndModal" class="btn small primary" style="margin-left: auto; padding: 2px 10px; font-size: 11.5px; font-weight: 600;" title="Modificar los parámetros de los indicadores (período RSI, sobreventa/sobrecompra, Bollinger, medias)">⚙ Parámetros de Indicadores</button>
+        <button type="button" id="btnSyncStratInds" class="btn small" style="padding: 2px 9px; font-size: 11px;" title="Activar exclusivamente los indicadores de la estrategia activa">🎯 Auto: Indicadores de estrategia</button>
       </div>
       <div class="chartwrap" id="chartWrap">
         <canvas id="chart"></canvas>
@@ -295,6 +296,19 @@
         niveles o una sola entrada y lo avisa.</p>
       <div class="formgrid" id="formMart"></div>
       <div class="row"><button class="btn primary" id="btnSaveMart">Guardar martingala</button></div>
+    </section>
+
+    <section class="card wide">
+      <div class="cardhead">
+        <h2>📊 Parámetros de Indicadores Técnicos</h2>
+        <span class="muted" style="font-size: 12px;">RSI, Bandas de Bollinger, Medias Móviles y Agotamiento</span>
+      </div>
+      <p class="note">Modifica en tiempo real los períodos y umbrales de los indicadores técnicos. Se recalculan al instante para el gráfico, la evaluación en vivo y la detección de oportunidades.</p>
+      <div class="formgrid" id="formIndParams"></div>
+      <div class="row">
+        <button class="btn primary" id="btnSaveIndParams">Guardar indicadores</button>
+        <button type="button" class="btn" id="btnResetIndDefaults">Restablecer valores por defecto</button>
+      </div>
     </section>
 
     <section class="card wide">
@@ -512,6 +526,105 @@
     <p id="dlgText"></p>
     <input id="dlgInput" type="text" autocomplete="off" hidden>
     <div class="row end"><button class="btn" value="cancel">Cancelar</button><button class="btn danger" id="dlgOk" value="ok">Confirmar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgIndParams" class="modal-dialog">
+  <div class="modal-header">
+    <h3>⚙ Parámetros de Indicadores Técnicos</h3>
+    <button type="button" class="modal-close-btn" id="btnCloseIndModal" title="Cerrar">✕</button>
+  </div>
+  <p class="muted" style="margin: 0 0 14px; font-size: 12px;">
+    Ajusta los períodos y niveles de sobreventa/sobrecompra. Al guardar, los indicadores se recalculan de inmediato en el gráfico y en el motor del bot.
+  </p>
+  <form id="formModalIndParams" onsubmit="event.preventDefault();">
+    <div class="ind-modal-grid">
+      <!-- Grupo RSI -->
+      <div class="ind-modal-group">
+        <div class="ind-modal-group-title">🟣 Índice de Fuerza Relativa (RSI)</div>
+        <div class="field">
+          <label for="m_RSI_PERIODO">Período de cálculo <small class="muted">(Velas)</small></label>
+          <input type="number" id="m_RSI_PERIODO" min="2" max="100" step="1">
+          <small class="muted">Estándar: 14 velas. Menor = más sensible.</small>
+        </div>
+        <div class="field">
+          <label for="m_RSI_SOBREVENTA">Nivel de Sobreventa (Gatillo Long)</label>
+          <input type="number" id="m_RSI_SOBREVENTA" min="5" max="50" step="1">
+          <small class="muted">El bot busca compras cuando el RSI cae a este valor o menos (ej: 20, 25, 30 o 35).</small>
+        </div>
+        <div class="field">
+          <label for="m_RSI_SOBRECOMPRA">Nivel de Sobrecompra (Gatillo Short)</label>
+          <input type="number" id="m_RSI_SOBRECOMPRA" min="50" max="95" step="1">
+          <small class="muted">El bot busca ventas cuando el RSI sube a este valor o más (ej: 65, 70, 80).</small>
+        </div>
+      </div>
+
+      <!-- Grupo Bollinger -->
+      <div class="ind-modal-group">
+        <div class="ind-modal-group-title">🔵 Bandas de Bollinger</div>
+        <div class="field">
+          <label for="m_BB_PERIODO">Período <small class="muted">(Media móvil central)</small></label>
+          <input type="number" id="m_BB_PERIODO" min="5" max="100" step="1">
+          <small class="muted">Estándar: 20 velas.</small>
+        </div>
+        <div class="field">
+          <label for="m_BB_DESVIACION">Desviaciones estándar (k)</label>
+          <input type="number" id="m_BB_DESVIACION" min="0.5" max="5.0" step="0.1">
+          <small class="muted">Estándar: 2.0 (ancho de las bandas superior e inferior).</small>
+        </div>
+        <div class="field">
+          <label for="m_VENTANA_AGOTAMIENTO">Ventana de velas de rebote</label>
+          <input type="number" id="m_VENTANA_AGOTAMIENTO" min="1" max="10" step="1">
+          <small class="muted">Velas recientes evaluadas para el toque de banda y RSI (estándar: 3).</small>
+        </div>
+      </div>
+
+      <!-- Grupo Medias Móviles -->
+      <div class="ind-modal-group">
+        <div class="ind-modal-group-title">🟡 Medias Móviles (EMA / SMA)</div>
+        <div class="field">
+          <label for="m_EMA_RAPIDA">EMA Rápida</label>
+          <input type="number" id="m_EMA_RAPIDA" min="2" max="100" step="1">
+          <small class="muted">Estándar: 20 velas (zona de valor y cruces).</small>
+        </div>
+        <div class="field">
+          <label for="m_EMA_LENTA">EMA Lenta</label>
+          <input type="number" id="m_EMA_LENTA" min="5" max="300" step="1">
+          <small class="muted">Estándar: 50 velas.</small>
+        </div>
+        <div class="field">
+          <label for="m_SMA_TENDENCIA">SMA Tendencia Macro</label>
+          <input type="number" id="m_SMA_TENDENCIA" min="20" max="500" step="1">
+          <small class="muted">Estándar: 200 velas (filtro de mercado alcista/bajista).</small>
+        </div>
+      </div>
+
+      <!-- Grupo Oscilador Estocástico & ATR -->
+      <div class="ind-modal-group">
+        <div class="ind-modal-group-title">🟢 Oscilador Estocástico & ATR</div>
+        <div class="field">
+          <label for="m_STOCH_SOBREVENTA">Estocástico Sobreventa</label>
+          <input type="number" id="m_STOCH_SOBREVENTA" min="5" max="45" step="1">
+          <small class="muted">Estándar: 20.</small>
+        </div>
+        <div class="field">
+          <label for="m_STOCH_SOBRECOMPRA">Estocástico Sobrecompra</label>
+          <input type="number" id="m_STOCH_SOBRECOMPRA" min="55" max="95" step="1">
+          <small class="muted">Estándar: 80.</small>
+        </div>
+        <div class="field">
+          <label for="m_ATR_PERIODO">ATR · Período Volatilidad</label>
+          <input type="number" id="m_ATR_PERIODO" min="2" max="50" step="1">
+          <small class="muted">Estándar: 14 velas (para cálculo de SL/TP y tolerancia).</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="row end" style="margin-top: 18px; gap: 8px; flex-wrap: wrap;">
+      <button type="button" class="btn" id="btnModalResetDefaults" style="margin-right: auto;">↺ Restablecer valores estándar</button>
+      <button type="button" class="btn" id="btnCancelIndModal">Cancelar</button>
+      <button type="button" class="btn primary" id="btnSaveIndModal">💾 Guardar y Recalcular Indicadores</button>
+    </div>
   </form>
 </dialog>
 <div id="toast" class="toast" hidden></div>

@@ -362,9 +362,11 @@ class Chart {
       ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.L, rsiTopY - 4); ctx.lineTo(g.W - g.R, rsiTopY - 4); ctx.stroke();
 
       // Zona sombreada entre nivel 20 y 80
-      // Subpanel de RSI (14) con umbrales configurables y búsqueda del último valor válido
-      const rsiOversold = (S && S.config && Number(S.config.RSI_SOBREVENTA)) || 35;
-      const rsiOverbought = (S && S.config && Number(S.config.RSI_SOBRECOMPRA)) || 65;
+      // Subpanel de RSI con umbrales configurables y búsqueda del último valor válido
+      const indCfg = (ann && ann.indicators_config) || (S && S.indicators) || {};
+      const rsiOversold = Number(indCfg.rsi_oversold ?? (cfgValues && cfgValues.RSI_SOBREVENTA) ?? 35);
+      const rsiOverbought = Number(indCfg.rsi_overbought ?? (cfgValues && cfgValues.RSI_SOBRECOMPRA) ?? 65);
+      const rsiPeriod = Number(indCfg.rsi_period ?? (cfgValues && cfgValues.RSI_PERIODO) ?? 14);
 
       // Zona sombreada entre nivel sobreventa y sobrecompra
       ctx.fillStyle = "rgba(179, 136, 255, 0.05)";
@@ -387,7 +389,7 @@ class Chart {
       ctx.fillStyle = css("--up"); ctx.font = "bold 9.5px Consolas, monospace";
       ctx.fillText(rsiOversold + " Sobreventa (Gatillo)", g.W - g.R + 4, yRsi(rsiOversold));
 
-      // Curva del oscilador RSI (14)
+      // Curva del oscilador RSI
       ctx.strokeStyle = "#b388ff"; ctx.lineWidth = 1.8; ctx.beginPath();
       let rsiStarted = false;
       for (let i = i0; i < i1; i++) {
@@ -419,7 +421,7 @@ class Chart {
       }
       ctx.font = "bold 11px system-ui, sans-serif";
       ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      let rsiTxt = "RSI (14): " + (lastRsi != null ? lastRsi.toFixed(1) : "–");
+      let rsiTxt = "RSI (" + rsiPeriod + "): " + (lastRsi != null ? lastRsi.toFixed(1) : "–");
       if (lastRsi != null && lastRsi <= rsiOversold) {
         ctx.fillStyle = css("--up");
         rsiTxt += "  ⚡ SOBREVENTA ≤ " + rsiOversold + " (Condición Gatillo cumplida)";
@@ -445,17 +447,28 @@ class Chart {
         `L ${f(a.low[i])}  C ${f(a.close[i])}`,
         `Vol ${f(a.volume[i], 1)}`
       ];
+      const indCfg = (ann && ann.indicators_config) || (S && S.indicators) || {};
+      const rsiOversold = Number(indCfg.rsi_oversold ?? (cfgValues && cfgValues.RSI_SOBREVENTA) ?? 35);
+      const rsiOverbought = Number(indCfg.rsi_overbought ?? (cfgValues && cfgValues.RSI_SOBRECOMPRA) ?? 65);
+      const rsiPeriod = Number(indCfg.rsi_period ?? (cfgValues && cfgValues.RSI_PERIODO) ?? 14);
       if (indState.rsi && a.rsi14 && a.rsi14[i] != null) {
-        lines.push(`RSI(14): ${f(a.rsi14[i], 1)}${a.rsi14[i] < 20 ? " (Sobreventa < 20 ✔)" : ""}`);
+        const isOv = a.rsi14[i] <= rsiOversold;
+        const isOb = a.rsi14[i] >= rsiOverbought;
+        const tag = isOv ? ` (Sobreventa ≤ ${rsiOversold} ✔)` : isOb ? ` (Sobrecompra ≥ ${rsiOverbought})` : "";
+        lines.push(`RSI(${rsiPeriod}): ${f(a.rsi14[i], 1)}${tag}`);
       }
       if (indState.bb && a.bb_up && a.bb_up[i] != null) {
-        lines.push(`BB Inf: ${f(a.bb_low[i])}  Med: ${f(a.bb_mid ? a.bb_mid[i] : null)}  Sup: ${f(a.bb_up[i])}`);
+        const bbPer = Number(indCfg.bb_period ?? (cfgValues && cfgValues.BB_PERIODO) ?? 20);
+        lines.push(`BB(${bbPer}) Inf: ${f(a.bb_low[i])}  Med: ${f(a.bb_mid ? a.bb_mid[i] : null)}  Sup: ${f(a.bb_up[i])}`);
       }
       if (indState.ema20 && a.ema20 && a.ema20[i] != null) {
-        lines.push(`EMA20: ${f(a.ema20[i])}${indState.ema50 && a.ema50 ? "  EMA50: " + f(a.ema50[i]) : ""}`);
+        const p20 = Number(indCfg.ema_fast ?? (cfgValues && cfgValues.EMA_RAPIDA) ?? 20);
+        const p50 = Number(indCfg.ema_slow ?? (cfgValues && cfgValues.EMA_LENTA) ?? 50);
+        lines.push(`EMA${p20}: ${f(a.ema20[i])}${indState.ema50 && a.ema50 ? `  EMA${p50}: ` + f(a.ema50[i]) : ""}`);
       }
       if (indState.sma200 && a.sma200 && a.sma200[i] != null) {
-        lines.push(`SMA200: ${f(a.sma200[i])}`);
+        const p200 = Number(indCfg.sma_trend ?? (cfgValues && cfgValues.SMA_TENDENCIA) ?? 200);
+        lines.push(`SMA${p200}: ${f(a.sma200[i])}`);
       }
       this.tip.textContent = lines.join("\n");
       this.tip.hidden = false; this.tip.style.left = Math.min(m.x + 14, g.W - 250) + "px"; this.tip.style.top = Math.max(4, m.y - 90) + "px";
@@ -629,7 +642,18 @@ function render(s) {
   renderChecks($("ph1").querySelector("tbody"), ev.phase1, true); renderChecks($("ph2").querySelector("tbody"), ev.phase2, false); renderChecks($("ph3").querySelector("tbody"), ev.phase3, false);
   badge($("ph2Badge"), ev.phase2_ok === undefined ? null : ev.phase2_ok); badge($("ph3Badge"), ev.phase3_ok === undefined ? null : ev.phase3_ok);
 
-  // estrategia y puntos de ejecución
+  // indicadores activos
+  if (s.indicators) {
+    updateIndicatorPills({
+      EMA_RAPIDA: s.indicators.ema_fast,
+      EMA_LENTA: s.indicators.ema_slow,
+      SMA_TENDENCIA: s.indicators.sma_trend,
+      BB_PERIODO: s.indicators.bb_period,
+      BB_DESVIACION: s.indicators.bb_dev,
+      RSI_PERIODO: s.indicators.rsi_period,
+    });
+  }
+
   // estrategia y puntos de ejecución
   if (s.strategy && s.strategy !== currentActiveStrategy) {
     currentActiveStrategy = s.strategy;
@@ -886,6 +910,37 @@ const ADV = [
   ["BREAK_EVEN_BUFFER_PCT", "Break-even · colchón", 0.0005, "0.001 = entrada +0.1%."],
   ["MAX_RETRASO_SENAL_SEG", "Retraso máx. de la señal (s)", 10, "Descarta señales viejas."],
 ];
+
+const IND_PARAMS = [
+  ["RSI_PERIODO", "RSI · Período", 1, "Número de velas para el cálculo del RSI (estándar: 14)."],
+  ["RSI_SOBREVENTA", "RSI · Sobreventa (Gatillo Long)", 1, "Nivel para buscar compras (ej: 20, 25, 30 o 35)."],
+  ["RSI_SOBRECOMPRA", "RSI · Sobrecompra (Gatillo Short)", 1, "Nivel para buscar ventas (ej: 65, 70 u 80)."],
+  ["BB_PERIODO", "Bollinger · Período", 1, "Media central de Bandas de Bollinger (estándar: 20)."],
+  ["BB_DESVIACION", "Bollinger · Desviaciones", 0.1, "Multiplicador de desviación estándar (estándar: 2.0)."],
+  ["EMA_RAPIDA", "Media Móvil Rápida (EMA)", 1, "Período de la EMA rápida (estándar: 20)."],
+  ["EMA_LENTA", "Media Móvil Lenta (EMA)", 1, "Período de la EMA lenta (estándar: 50)."],
+  ["SMA_TENDENCIA", "Media Tendencia Macro (SMA)", 1, "Período de la SMA de tendencia macro (estándar: 200)."],
+  ["ATR_PERIODO", "ATR · Período Volatilidad", 1, "Período para el Average True Range (estándar: 14)."],
+  ["VENTANA_AGOTAMIENTO", "Ventana de rebote (velas)", 1, "Velas recientes evaluadas para el toque de banda y RSI (estándar: 3)."],
+  ["STOCH_SOBREVENTA", "Estocástico · Sobreventa", 1, "Oscilador estocástico sobreventa (estándar: 20)."],
+  ["STOCH_SOBRECOMPRA", "Estocástico · Sobrecompra", 1, "Oscilador estocástico sobrecompra (estándar: 80)."],
+];
+
+function updateIndicatorPills(cfg) {
+  if (!cfg) return;
+  const ema20 = cfg.EMA_RAPIDA || 20;
+  const ema50 = cfg.EMA_LENTA || 50;
+  const sma200 = cfg.SMA_TENDENCIA || 200;
+  const bbPer = cfg.BB_PERIODO || 20;
+  const bbDev = cfg.BB_DESVIACION || 2.0;
+  const rsiPer = cfg.RSI_PERIODO || 14;
+  if ($("lblEma20")) $("lblEma20").textContent = `EMA ${ema20}`;
+  if ($("lblEma50")) $("lblEma50").textContent = `EMA ${ema50}`;
+  if ($("lblSma200")) $("lblSma200").textContent = `SMA ${sma200}`;
+  if ($("lblBb")) $("lblBb").textContent = `Bollinger (${bbPer}, ${bbDev})`;
+  if ($("lblRsi")) $("lblRsi").textContent = `RSI (${rsiPer})`;
+}
+
 let cfgLoaded = false, cfgValues = {}, modeSel = "testnet";
 
 function buildForm(box, fields) {
@@ -901,7 +956,7 @@ function buildForm(box, fields) {
   }
 }
 function fillForm(values) {
-  for (const [key, , kind] of [...RISK, ...TFS, ...MART, ...ADV]) {
+  for (const [key, , kind] of [...RISK, ...TFS, ...MART, ...ADV, ...IND_PARAMS]) {
     const el = $("f_" + key); if (!el) continue;
     if (kind === "bool") el.checked = !!values[key]; else el.value = values[key];
   }
@@ -931,7 +986,11 @@ function credStatus(id, info, showMask) { $(id).textContent = info && info.set ?
 
 async function loadConfig() {
   const c = await api("/api/config"); if (!c) return; cfgValues = c.values;
-  buildForm($("formRisk"), RISK); buildForm($("formTfs"), TFS); buildForm($("formMart"), MART); buildForm($("formAdv"), ADV); fillForm(c.values); cfgLoaded = true;
+  buildForm($("formRisk"), RISK); buildForm($("formTfs"), TFS); buildForm($("formMart"), MART); buildForm($("formAdv"), ADV);
+  if ($("formIndParams")) buildForm($("formIndParams"), IND_PARAMS);
+  fillForm(c.values);
+  updateIndicatorPills(c.values);
+  cfgLoaded = true;
   const cr = c.credentials;
   credStatus("st_testnet_api_key", cr.testnet_api_key, true); credStatus("st_testnet_api_secret", cr.testnet_api_secret);
   credStatus("st_real_api_key", cr.real_api_key, true); credStatus("st_real_api_secret", cr.real_api_secret); credStatus("st_telegram_token", cr.telegram_token);
@@ -991,10 +1050,120 @@ $("testUrl").onchange = () => applyConfig({ ENTORNO_PRUEBAS_URL: $("testUrl").va
 
 $("btnSaveCfg").onclick = async () => {
   const values = {};
-  for (const [key, , kind] of [...RISK, ...TFS, ...MART, ...ADV]) { const el = $("f_" + key); values[key] = kind === "bool" ? el.checked : el.value; }
+  for (const [key, , kind] of [...RISK, ...TFS, ...MART, ...ADV, ...IND_PARAMS]) { const el = $("f_" + key); if (el) values[key] = kind === "bool" ? el.checked : el.value; }
   values.TELEGRAM_ACTIVO = $("TELEGRAM_ACTIVO").checked; values.TELEGRAM_AVISAR_SENALES_BLOQUEADAS = $("TELEGRAM_AVISAR_SENALES_BLOQUEADAS").checked;
-  const r = await applyConfig(values); $("cfgMsg").textContent = r && r.ok ? "Guardado ✔" : "";
+  const r = await applyConfig(values);
+  $("cfgMsg").textContent = r && r.ok ? "Guardado ✔" : "";
+  if (r && r.ok) { updateIndicatorPills(cfgValues); refreshChart(true); }
 };
+
+if ($("btnSaveIndParams")) $("btnSaveIndParams").onclick = () => $("btnSaveCfg").onclick();
+if ($("btnResetIndDefaults")) $("btnResetIndDefaults").onclick = async () => {
+  const defaults = {
+    RSI_PERIODO: 14, RSI_SOBREVENTA: 35.0, RSI_SOBRECOMPRA: 65.0,
+    BB_PERIODO: 20, BB_DESVIACION: 2.0, EMA_RAPIDA: 20, EMA_LENTA: 50,
+    SMA_TENDENCIA: 200, ATR_PERIODO: 14, VENTANA_AGOTAMIENTO: 3,
+    STOCH_SOBREVENTA: 20.0, STOCH_SOBRECOMPRA: 80.0
+  };
+  const r = await applyConfig(defaults);
+  if (r && r.ok) { updateIndicatorPills(cfgValues); refreshChart(true); }
+};
+
+/* Modal Interactivo de Parámetros de Indicadores */
+function openIndModal() {
+  const dlg = $("dlgIndParams");
+  if (!dlg) return;
+  const c = cfgValues || {};
+  const setVal = (id, key, def) => {
+    const el = $("m_" + id);
+    if (el) el.value = c[key] != null ? c[key] : def;
+  };
+  setVal("RSI_PERIODO", "RSI_PERIODO", 14);
+  setVal("RSI_SOBREVENTA", "RSI_SOBREVENTA", 35.0);
+  setVal("RSI_SOBRECOMPRA", "RSI_SOBRECOMPRA", 65.0);
+  setVal("BB_PERIODO", "BB_PERIODO", 20);
+  setVal("BB_DESVIACION", "BB_DESVIACION", 2.0);
+  setVal("VENTANA_AGOTAMIENTO", "VENTANA_AGOTAMIENTO", 3);
+  setVal("EMA_RAPIDA", "EMA_RAPIDA", 20);
+  setVal("EMA_LENTA", "EMA_LENTA", 50);
+  setVal("SMA_TENDENCIA", "SMA_TENDENCIA", 200);
+  setVal("STOCH_SOBREVENTA", "STOCH_SOBREVENTA", 20.0);
+  setVal("STOCH_SOBRECOMPRA", "STOCH_SOBRECOMPRA", 80.0);
+  setVal("ATR_PERIODO", "ATR_PERIODO", 14);
+  dlg.showModal();
+}
+
+function closeIndModal() {
+  const dlg = $("dlgIndParams");
+  if (dlg && dlg.open) dlg.close();
+}
+
+async function saveIndModal() {
+  const getNum = (id, fallback) => {
+    const el = $("m_" + id);
+    return el && el.value !== "" ? Number(el.value) : fallback;
+  };
+  const rsiPer = getNum("RSI_PERIODO", 14);
+  const rsiOv = getNum("RSI_SOBREVENTA", 35.0);
+  const rsiOb = getNum("RSI_SOBRECOMPRA", 65.0);
+  if (rsiOv >= rsiOb) {
+    toast("El umbral de sobreventa debe ser menor al de sobrecompra.", "err");
+    return;
+  }
+  const vals = {
+    RSI_PERIODO: rsiPer,
+    RSI_SOBREVENTA: rsiOv,
+    RSI_SOBRECOMPRA: rsiOb,
+    BB_PERIODO: getNum("BB_PERIODO", 20),
+    BB_DESVIACION: getNum("BB_DESVIACION", 2.0),
+    VENTANA_AGOTAMIENTO: getNum("VENTANA_AGOTAMIENTO", 3),
+    EMA_RAPIDA: getNum("EMA_RAPIDA", 20),
+    EMA_LENTA: getNum("EMA_LENTA", 50),
+    SMA_TENDENCIA: getNum("SMA_TENDENCIA", 200),
+    STOCH_SOBREVENTA: getNum("STOCH_SOBREVENTA", 20.0),
+    STOCH_SOBRECOMPRA: getNum("STOCH_SOBRECOMPRA", 80.0),
+    ATR_PERIODO: getNum("ATR_PERIODO", 14),
+  };
+  const r = await applyConfig(vals);
+  if (r && r.ok) {
+    closeIndModal();
+    updateIndicatorPills(cfgValues);
+    refreshChart(true);
+  }
+}
+
+function resetModalDefaults() {
+  const setVal = (id, def) => { const el = $("m_" + id); if (el) el.value = def; };
+  setVal("RSI_PERIODO", 14);
+  setVal("RSI_SOBREVENTA", 35.0);
+  setVal("RSI_SOBRECOMPRA", 65.0);
+  setVal("BB_PERIODO", 20);
+  setVal("BB_DESVIACION", 2.0);
+  setVal("VENTANA_AGOTAMIENTO", 3);
+  setVal("EMA_RAPIDA", 20);
+  setVal("EMA_LENTA", 50);
+  setVal("SMA_TENDENCIA", 200);
+  setVal("STOCH_SOBREVENTA", 20.0);
+  setVal("STOCH_SOBRECOMPRA", 80.0);
+  setVal("ATR_PERIODO", 14);
+}
+
+if ($("btnOpenIndModal")) $("btnOpenIndModal").onclick = openIndModal;
+if ($("btnCloseIndModal")) $("btnCloseIndModal").onclick = closeIndModal;
+if ($("btnCancelIndModal")) $("btnCancelIndModal").onclick = closeIndModal;
+if ($("btnSaveIndModal")) $("btnSaveIndModal").onclick = saveIndModal;
+if ($("btnModalResetDefaults")) $("btnModalResetDefaults").onclick = resetModalDefaults;
+
+const dlgInd = $("dlgIndParams");
+if (dlgInd) {
+  dlgInd.addEventListener("click", (e) => {
+    const rect = dlgInd.getBoundingClientRect();
+    const isInDialog = (rect.top <= e.clientY && e.clientY <= rect.top + rect.height
+      && rect.left <= e.clientX && e.clientX <= rect.left + rect.width);
+    if (!isInDialog) dlgInd.close();
+  });
+}
+
 const CRED_IDS = ["testnet_api_key", "testnet_api_secret", "real_api_key", "real_api_secret", "telegram_token"];
 // Guarda los campos escritos (los vacíos no se tocan). Devuelve {ok, saved, errors}.
 async function saveTyped(ids) {

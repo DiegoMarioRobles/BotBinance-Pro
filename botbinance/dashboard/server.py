@@ -100,6 +100,18 @@ def create_app(engine, state, cfg, store) -> Flask:
                 "ratio_config": cfg.RATIO_RIESGO_BENEFICIO,
                 "leverage": cfg.APALANCAMIENTO,
             },
+            "indicators": {
+                "rsi_period": getattr(cfg, "RSI_PERIODO", 14),
+                "rsi_oversold": getattr(cfg, "RSI_SOBREVENTA", 35.0),
+                "rsi_overbought": getattr(cfg, "RSI_SOBRECOMPRA", 65.0),
+                "bb_period": getattr(cfg, "BB_PERIODO", 20),
+                "bb_dev": getattr(cfg, "BB_DESVIACION", 2.0),
+                "ema_fast": getattr(cfg, "EMA_RAPIDA", 20),
+                "ema_slow": getattr(cfg, "EMA_LENTA", 50),
+                "sma_trend": getattr(cfg, "SMA_TENDENCIA", 200),
+                "atr_period": getattr(cfg, "ATR_PERIODO", 14),
+                "ventana_agotamiento": getattr(cfg, "VENTANA_AGOTAMIENTO", 3),
+            },
             "history": state.history,
             "logs": state.recent_logs(since),
             "trigger_tf": cfg.TF_GATILLO,
@@ -163,10 +175,18 @@ def create_app(engine, state, cfg, store) -> Flask:
             ann["sr"] = ev["sr"]
         if trade and trade.get("levels"):
             ann["levels"] = [{"price": lv["price"], "qty": lv["qty"], "filled": lv["filled"]} for lv in trade["levels"]]
-        ann["history_markers"] = [
-            {"time": h.get("entry_time") or h.get("close_time"), "close_time": h.get("close_time"), "side": h.get("side"), "entry": h.get("entry"), "exit": h.get("exit"), "net": h.get("net"), "reason": h.get("reason")}
-            for h in state.history if h.get("close_time")
-        ][-20:]
+        ann["indicators_config"] = {
+            "rsi_period": getattr(cfg, "RSI_PERIODO", 14),
+            "rsi_oversold": getattr(cfg, "RSI_SOBREVENTA", 35.0),
+            "rsi_overbought": getattr(cfg, "RSI_SOBRECOMPRA", 65.0),
+            "bb_period": getattr(cfg, "BB_PERIODO", 20),
+            "bb_dev": getattr(cfg, "BB_DESVIACION", 2.0),
+            "ema_fast": getattr(cfg, "EMA_RAPIDA", 20),
+            "ema_slow": getattr(cfg, "EMA_LENTA", 50),
+            "sma_trend": getattr(cfg, "SMA_TENDENCIA", 200),
+            "atr_period": getattr(cfg, "ATR_PERIODO", 14),
+            "ventana_agotamiento": getattr(cfg, "VENTANA_AGOTAMIENTO", 3),
+        }
         data["annotations"] = ann
         data["tfs"] = CHART_TFS
         data["tf"] = tf

@@ -122,18 +122,19 @@ def macd(close, fast: int = 12, slow: int = 26, signal: int = 9):
     return line, sig, line - sig
 
 
-def enrich(df: pd.DataFrame, bb_period: int = 20, bb_dev: float = 2.0) -> pd.DataFrame:
+def enrich(df: pd.DataFrame, bb_period: int = 20, bb_dev: float = 2.0, rsi_period: int = 14,
+           ema_fast: int = 20, ema_slow: int = 50, sma_trend: int = 200, atr_period: int = 14) -> pd.DataFrame:
     """Devuelve una copia de `df` (velas cerradas OHLCV) con todas las columnas de indicadores."""
     out = df.copy()
     c, h, l, v = (out[k].to_numpy(dtype=float) for k in ("close", "high", "low", "volume"))
-    out["ema20"] = ema(c, 20)
-    out["ema50"] = ema(c, 50)
-    out["sma200"] = sma(c, 200)
-    out["rsi14"] = rsi(c, 14)
-    out["atr14"] = atr(h, l, c, 14)
+    out["ema20"] = ema(c, int(ema_fast))
+    out["ema50"] = ema(c, int(ema_slow))
+    out["sma200"] = sma(c, int(sma_trend))
+    out["rsi14"] = rsi(c, int(rsi_period))
+    out["atr14"] = atr(h, l, c, int(atr_period))
     a, pdi, mdi = adx(h, l, c, 14)
     out["adx14"], out["plus_di"], out["minus_di"] = a, pdi, mdi
-    out["bb_mid"], out["bb_up"], out["bb_low"] = bollinger(c, bb_period, bb_dev)
+    out["bb_mid"], out["bb_up"], out["bb_low"] = bollinger(c, int(bb_period), float(bb_dev))
     out["stoch_k"], out["stoch_d"] = stochastic(h, l, c)
     out["macd"], out["macd_signal"], out["macd_hist"] = macd(c)
     out["vol_sma20"] = sma(v, 20)

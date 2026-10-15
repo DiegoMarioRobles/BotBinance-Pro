@@ -367,17 +367,18 @@ def evaluate_estrategia_1(frames: dict[str, pd.DataFrame], cfg, cache: dict | No
     rsi_ob = float(getattr(cfg, "RSI_SOBRECOMPRA", 65.0))
 
     # ---------------- FASE 2: retroceso con RSI <= sobreventa (LONG) o >= sobrecompra (SHORT) ----------------
+    rsi_period = int(getattr(cfg, "RSI_PERIODO", 14))
     recent_rsi = [float(trig.iloc[-1 - k].rsi14) for k in range(min(window, len(trig))) if not pd.isna(trig.iloc[-1 - k].rsi14)]
     if side == "LONG":
         rsi_target = rsi_ov
         rsi_hit = any(val <= rsi_target for val in recent_rsi)
         rsi_val_str = f"{float(t.rsi14):.1f} (mínimo reciente: {min(recent_rsi):.1f})" if recent_rsi else "n/d"
-        phase2_name = f"{cfg.TF_GATILLO} · RSI(14) en sobreventa (≤ {rsi_target:g})"
+        phase2_name = f"{cfg.TF_GATILLO} · RSI({rsi_period}) en sobreventa (≤ {rsi_target:g})"
     else:
         rsi_target = rsi_ob
         rsi_hit = any(val >= rsi_target for val in recent_rsi)
         rsi_val_str = f"{float(t.rsi14):.1f} (máximo reciente: {max(recent_rsi):.1f})" if recent_rsi else "n/d"
-        phase2_name = f"{cfg.TF_GATILLO} · RSI(14) en sobrecompra (≥ {rsi_target:g})"
+        phase2_name = f"{cfg.TF_GATILLO} · RSI({rsi_period}) en sobrecompra (≥ {rsi_target:g})"
 
     ev.phase2 = [Check(phase2_name, rsi_val_str, ok=rsi_hit)]
     ev.phase2_ok = rsi_hit
