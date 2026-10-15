@@ -621,7 +621,8 @@ async function loadConfig() {
   if (c.strategies) {
     if (topSel && !topSel.options.length) {
       for (const [id, info] of Object.entries(c.strategies)) {
-        topSel.append(h("option", { value: id, text: info.name + ": " + info.description }));
+        const descText = info.desc || info.description || "";
+        topSel.append(h("option", { value: id, text: info.name + (descText ? " — " + descText : "") }));
       }
       topSel.onchange = async () => {
         await applyConfig({ ESTRATEGIA: topSel.value });
@@ -630,7 +631,8 @@ async function loadConfig() {
     if (topSel && c.active_strategy) topSel.value = c.active_strategy;
     if (btSel && !btSel.options.length) {
       for (const [id, info] of Object.entries(c.strategies)) {
-        btSel.append(h("option", { value: id, text: info.name + ": " + info.description }));
+        const descText = info.desc || info.description || "";
+        btSel.append(h("option", { value: id, text: info.name + (descText ? " — " + descText : "") }));
       }
       if (c.active_strategy) btSel.value = c.active_strategy;
     }
