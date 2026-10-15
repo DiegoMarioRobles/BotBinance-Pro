@@ -562,6 +562,7 @@ class Engine:
         mart = {"si": True, "no": False}.get(str(p.get("martingala", "")).strip().lower())
         over = {
             "ESTRATEGIA": p.get("estrategia"),
+            "APALANCAMIENTO": p.get("apalancamiento"),
             "TF_TENDENCIA": p.get("tendencia"), "TF_TENDENCIA_SUPERIOR": p.get("superior"),
             "TF_ZONA": p.get("zona"), "TF_GATILLO": p.get("gatillo"), "VENTANA_AGOTAMIENTO": p.get("ventana"),
             "MARTINGALA_ACTIVA": mart, "MARTINGALA_NIVELES": p.get("niveles"),

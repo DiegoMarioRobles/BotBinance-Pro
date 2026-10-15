@@ -637,6 +637,12 @@ async function loadConfig() {
       if (c.active_strategy) btSel.value = c.active_strategy;
     }
   }
+
+  if (c.values) {
+    if (c.values.APALANCAMIENTO && $("btLev") && !$("btLev").value) $("btLev").value = c.values.APALANCAMIENTO;
+    if (c.values.MARGEN_EN_USO_POR_OPERACION && $("btMargen") && !$("btMargen").value) $("btMargen").placeholder = c.values.MARGEN_EN_USO_POR_OPERACION;
+    if (typeof updateBtNotional === "function") updateBtNotional();
+  }
 }
 
 async function applyConfig(values, confirmReal) {
@@ -780,6 +786,10 @@ const PARAM_EXPLANATIONS = {
     title: "Margen por operación (USDT)",
     desc: "Capital en dólares bloqueado como margen aislado para la posición. Si usas martingala, es el presupuesto total repartido entre los niveles."
   },
+  btLev: {
+    title: "Apalancamiento (1x a 125x)",
+    desc: "Multiplicador de tu capital. Margen × Apalancamiento define la posición nominal en Binance (debe ser de al menos $100 USDT para BTC/USDT)."
+  },
   btRiesgoM: {
     title: "Riesgo máx. martingala (USDT)",
     desc: "Pérdida monetaria máxima permitida en dólares si todas las recompras se ejecutan y el precio toca el Stop Loss final."
@@ -789,6 +799,28 @@ const PARAM_EXPLANATIONS = {
     desc: "Cantidad máxima de velas (1 a 5) que el bot espera para que se confirme el gatillo tras entrar a la zona de valor antes de cancelar la señal."
   }
 };
+
+function updateBtNotional() {
+  const mInput = $("btMargen") ? $("btMargen").value.trim() : "";
+  const lInput = $("btLev") ? $("btLev").value.trim() : "";
+  const m = parseFloat(mInput.replace(",", ".")) || (mInput === "0" ? 0 : 20);
+  const l = parseInt(lInput.replace(",", ".")) || (lInput === "0" ? 0 : 10);
+  const nom = m * l;
+  const bar = $("btNotionalBar");
+  if (!bar) return;
+  const valEl = $("btNotionalVal");
+  const ruleEl = $("btNotionalRule");
+  valEl.textContent = "$" + nom.toFixed(2) + " USDT";
+  if (nom < 100) {
+    bar.className = "nominal-calc-bar warn";
+    ruleEl.textContent = `(⚠ Menor a $100 Binance. Sube el margen a $${(100 / Math.max(l, 1)).toFixed(1)} o el apalancamiento a ${Math.ceil(100 / Math.max(m, 0.1))}x)`;
+  } else {
+    bar.className = "nominal-calc-bar ok";
+    ruleEl.textContent = `(✔ Cumple el mínimo obligatorio de Binance de $100 USDT)`;
+  }
+}
+if ($("btMargen")) $("btMargen").addEventListener("input", updateBtNotional);
+if ($("btLev")) $("btLev").addEventListener("input", updateBtNotional);
 
 function initParamTips() {
   const box = $("btParamHelp"), text = $("btParamHelpText");
@@ -824,6 +856,7 @@ function initParamTips() {
       inp.addEventListener("blur", onLeave);
     }
   });
+  updateBtNotional();
 }
 
 $("btnBtRun").onclick = async () => {
@@ -834,6 +867,7 @@ $("btnBtRun").onclick = async () => {
   // Sanitizar inputs (permitir comas en números en teclado español)
   const slipVal = ($("btSlip").value || "0.0002").replace(",", ".").trim();
   const margenVal = ($("btMargen").value || "").replace(",", ".").trim();
+  const levVal = ($("btLev").value || "").replace(",", ".").trim();
   const riesgoMVal = ($("btRiesgoM").value || "").replace(",", ".").trim();
   const desdeVal = ($("btDesde").value || "2022-01-01").trim();
   const hastaVal = ($("btHasta").value || new Date().toISOString().slice(0, 10)).trim();
@@ -860,6 +894,7 @@ $("btnBtRun").onclick = async () => {
     slippage: slipVal,
     martingala: $("btMart").value,
     margen: margenVal,
+    apalancamiento: levVal,
     riesgo_mart: riesgoMVal
   });
 

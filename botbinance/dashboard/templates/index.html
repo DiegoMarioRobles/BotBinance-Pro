@@ -331,7 +331,7 @@
             <select id="btGatillo"></select>
           </div>
 
-          <!-- Gestión y Margen -->
+          <!-- Gestión, Margen y Apalancamiento -->
           <div class="field has-tip" data-param="btMart">
             <label for="btMart"><span>Martingala</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
             <select id="btMart">
@@ -342,16 +342,27 @@
           </div>
           <div class="field has-tip" data-param="btMargen">
             <label for="btMargen"><span>Margen (USDT)</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
-            <input id="btMargen" type="text" placeholder="(config ej. 20)">
+            <input id="btMargen" type="text" placeholder="20">
+          </div>
+          <div class="field has-tip" data-param="btLev">
+            <label for="btLev"><span>Apalancamiento</span><span class="tip-ico" title="Poder de compra (1x a 125x)">ⓘ</span></label>
+            <input id="btLev" type="number" min="1" max="125" step="1" value="10" placeholder="10">
           </div>
           <div class="field has-tip" data-param="btRiesgoM">
             <label for="btRiesgoM"><span>Riesgo máx. (USDT)</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
-            <input id="btRiesgoM" type="text" placeholder="(config ej. 3)">
+            <input id="btRiesgoM" type="text" placeholder="3">
           </div>
           <div class="field has-tip" data-param="btVentana">
             <label for="btVentana"><span>Ventana agotamiento</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
-            <input id="btVentana" type="number" min="1" max="5" placeholder="(config ej. 3)">
+            <input id="btVentana" type="number" min="1" max="5" placeholder="3">
           </div>
+        </div>
+
+        <!-- CALCULADORA DE POSICIÓN NOMINAL EN TIEMPO REAL -->
+        <div class="nominal-calc-bar ok" id="btNotionalBar">
+          <span class="n-label">📊 Posición nominal:</span>
+          <b class="n-val" id="btNotionalVal">$200.00 USDT</b>
+          <span class="n-rule" id="btNotionalRule">(✔ Cumple el mínimo obligatorio de Binance de $100 USDT)</span>
         </div>
 
         <!-- EXPLICACIÓN INTERACTIVA AL POSICIONARSE EN CUALQUIER PARÁMETRO -->
