@@ -44,6 +44,7 @@
   </div>
   <div class="price"><span id="price">–</span><small id="priceAge"></small></div>
   <div class="actions">
+    <button id="btnHeaderForceClose" class="btn danger btn-force-close" style="display:none;" title="Cerrar inmediatamente la posición activa de BTC a precio de mercado">🚨 Cierre Forzado</button>
     <button id="btnPause" class="btn warn">Pausar</button>
     <button id="btnResume" class="btn ok">Reanudar</button>
   </div>
@@ -78,7 +79,7 @@
     </div>
     <div class="op-banner-metrics" id="opBannerMetrics"></div>
     <div class="op-banner-action" id="opBannerAction" hidden>
-      <button type="button" id="btnBannerClose" class="btn danger small">Cerrar a mercado</button>
+      <button type="button" id="btnBannerClose" class="btn danger btn-force-close-banner">🚨 CIERRE FORZADO A MERCADO</button>
     </div>
   </div>
 
@@ -176,7 +177,7 @@
     </section>
 
     <section class="card">
-      <div class="cardhead"><h2>Posición y Movimientos</h2><button id="btnClose" class="btn danger small" hidden>Cerrar a mercado</button></div>
+      <div class="cardhead"><h2>Posición y Movimientos</h2><button id="btnClose" class="btn danger btn-force-close-small" hidden>🚨 Cierre Forzado</button></div>
       <div id="posBox" class="muted">Sin operación abierta.</div>
       <h3>Cuenta</h3>
       <div id="balBox" class="kv"></div>
@@ -315,7 +316,11 @@
       <div class="cardhead"><h2>Capital y riesgo</h2></div>
       <div class="formgrid" id="formRisk"></div>
       <details><summary>Parámetros avanzados de la estrategia</summary><div class="formgrid" id="formAdv"></div></details>
-      <div class="row"><button class="btn primary" id="btnSaveCfg">Guardar parámetros</button><small class="muted" id="cfgMsg"></small></div>
+      <div class="row" style="gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button class="btn primary" id="btnSaveCfg">Guardar parámetros</button>
+        <button type="button" class="btn" id="btnLoadStrat1Recommended" style="border-color: var(--accent); color: var(--accent); font-weight: 600;" title="Aplica 4h/15m, RSI 28, BB 20/2 y Ratio 1.5 para operar al menos 1 vez al día">⚡ Cargar recomendados Estrategia 1 (Diaria)</button>
+        <small class="muted" id="cfgMsg"></small>
+      </div>
     </section>
   </div>
 </main>

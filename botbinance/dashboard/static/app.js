@@ -741,7 +741,10 @@ function render(s) {
   }
 
   // posición
-  const pb = $("posBox"); $("btnClose").hidden = !(tr || s.position);
+  const pb = $("posBox");
+  const hasTrade = Boolean(tr || s.position);
+  $("btnClose").hidden = !hasTrade;
+  if ($("btnHeaderForceClose")) $("btnHeaderForceClose").style.display = hasTrade ? "inline-flex" : "none";
   if (tr) {
     pb.className = "kv";
     kv(pb, [["Lado", tr.side, tr.side === "LONG" ? "pos" : "neg"], ["Entrada", usd(tr.entry)], ["Cantidad", tr.qty + " BTC"], ["Marca", usd(tr.mark)],
@@ -854,12 +857,20 @@ $("btnPause").onclick = async () => { await api("/api/pause", {}); poll(); };
 $("btnResume").onclick = async () => {
   const r = await api("/api/resume", {}); if (r && r.ok === false) toast(r.error, "err"); poll();
 };
-$("btnClose").onclick = async () => {
-  if (await ask({ title: "Cerrar posición", text: "Se cerrará a mercado la posición abierta. ¿Continuar?", okLabel: "Cerrar ahora" })) {
-    const r = await api("/api/close_position", {}); toast(r.message, "ok"); poll();
+const handleForceClose = async () => {
+  if (await ask({
+    title: "🚨 Cierre Forzado a Mercado",
+    text: "Se cerrará de INMEDIATO la posición activa de BTC a precio de mercado y se cancelarán todas las órdenes de Stop Loss y Take Profit pendientes en Binance.\n\n¿Confirmas el cierre forzado ahora?",
+    okLabel: "🚨 Sí, Cerrar Posición Ahora",
+  })) {
+    const r = await api("/api/close_position", {});
+    toast(r ? r.message : "Orden de cierre enviada", "ok");
+    poll();
   }
 };
-if ($("btnBannerClose")) $("btnBannerClose").onclick = () => $("btnClose").click();
+$("btnClose").onclick = handleForceClose;
+if ($("btnBannerClose")) $("btnBannerClose").onclick = handleForceClose;
+if ($("btnHeaderForceClose")) $("btnHeaderForceClose").onclick = handleForceClose;
 
 /* ------------------------------------------------------------------ configuración */
 const TREND = ["4h", "8h", "12h", "16h", "20h", "1d", "2d", "3d", "1w", "1M"];
@@ -1068,6 +1079,35 @@ if ($("btnResetIndDefaults")) $("btnResetIndDefaults").onclick = async () => {
   const r = await applyConfig(defaults);
   if (r && r.ok) { updateIndicatorPills(cfgValues); refreshChart(true); }
 };
+
+if ($("btnLoadStrat1Recommended")) {
+  $("btnLoadStrat1Recommended").onclick = async () => {
+    const rec = {
+      ESTRATEGIA: "estrategia_1",
+      TF_TENDENCIA: "4h",
+      TF_TENDENCIA_SUPERIOR: "",
+      TF_ZONA: "15m",
+      TF_FIBONACCI: "4h",
+      TF_GATILLO: "15m",
+      ADX_TENDENCIA_MIN: 20.0,
+      ADX_LATERAL_MAX: 18.0,
+      RSI_SOBREVENTA: 28.0,
+      RSI_SOBRECOMPRA: 72.0,
+      VENTANA_AGOTAMIENTO: 3,
+      RATIO_RIESGO_BENEFICIO: 1.5,
+      BB_PERIODO: 20,
+      BB_DESVIACION: 2.0,
+      RSI_PERIODO: 14,
+    };
+    fillForm(rec);
+    const r = await applyConfig(rec);
+    if (r && r.ok) {
+      toast("✔ Parámetros recomendados para Estrategia 1 (Diaria) aplicados con éxito", "ok");
+      if (typeof updateIndicatorPills === "function") updateIndicatorPills(cfgValues);
+      if (typeof refreshChart === "function") refreshChart(true);
+    }
+  };
+}
 
 /* Modal Interactivo de Parámetros de Indicadores */
 function openIndModal() {
