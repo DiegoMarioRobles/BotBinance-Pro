@@ -241,22 +241,6 @@ def _coerce(value, current):
     return str(value).strip()
 
 
-RECOMMENDED_STRATEGY_1_DEFAULTS = {
-    "ESTRATEGIA": "estrategia_1",
-    "RATIO_RIESGO_BENEFICIO": 1.5,
-    "TF_TENDENCIA": "4h",
-    "TF_TENDENCIA_SUPERIOR": "",
-    "TF_ZONA": "15m",
-    "TF_FIBONACCI": "4h",
-    "TF_GATILLO": "15m",
-    "ADX_TENDENCIA_MIN": 20.0,
-    "ADX_LATERAL_MAX": 18.0,
-    "RSI_SOBREVENTA": 28.0,
-    "RSI_SOBRECOMPRA": 72.0,
-    "VENTANA_AGOTAMIENTO": 3,
-}
-
-
 class ConfigStore:
     """Carga/guarda Settings en disco (con candado: el dashboard y el bot lo usan a la vez)."""
 
@@ -267,15 +251,11 @@ class ConfigStore:
     def load(self) -> Settings:
         s = Settings()
         data = read_json(self.path, {}) or {}
-        if not data and not self.path.exists():
-            data = dict(RECOMMENDED_STRATEGY_1_DEFAULTS)
-            s.apply(data)
-            self.save(s)
-            return s
         s.apply(data)
         return s
 
     def save(self, s: Settings) -> None:
         with self._lock:
             write_json(self.path, s.to_dict())
+
 

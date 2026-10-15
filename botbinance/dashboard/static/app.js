@@ -1080,6 +1080,35 @@ if ($("btnResetIndDefaults")) $("btnResetIndDefaults").onclick = async () => {
   if (r && r.ok) { updateIndicatorPills(cfgValues); refreshChart(true); }
 };
 
+if ($("btnResetStrat1Defaults")) {
+  $("btnResetStrat1Defaults").onclick = async () => {
+    const def = {
+      ESTRATEGIA: "estrategia_1",
+      TF_TENDENCIA: "1d",
+      TF_TENDENCIA_SUPERIOR: "1w",
+      TF_ZONA: "4h",
+      TF_FIBONACCI: "1d",
+      TF_GATILLO: "1h",
+      ADX_TENDENCIA_MIN: 25.0,
+      ADX_LATERAL_MAX: 22.0,
+      RSI_SOBREVENTA: 35.0,
+      RSI_SOBRECOMPRA: 65.0,
+      VENTANA_AGOTAMIENTO: 1,
+      RATIO_RIESGO_BENEFICIO: 3.0,
+      BB_PERIODO: 20,
+      BB_DESVIACION: 2.0,
+      RSI_PERIODO: 14,
+    };
+    fillForm(def);
+    const r = await applyConfig(def);
+    if (r && r.ok) {
+      toast("✔ Parámetros predeterminados oficiales de Estrategia 1 restaurados", "ok");
+      if (typeof updateIndicatorPills === "function") updateIndicatorPills(cfgValues);
+      if (typeof refreshChart === "function") refreshChart(true);
+    }
+  };
+}
+
 if ($("btnLoadStrat1Recommended")) {
   $("btnLoadStrat1Recommended").onclick = async () => {
     const rec = {
