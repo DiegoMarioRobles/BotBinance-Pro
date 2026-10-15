@@ -93,7 +93,14 @@ def create_app(engine, state, cfg, store) -> Flask:
             "position": state.position,
             "trade": state.trade,
             "balance": state.balance,
-            "history": state.history[-20:],
+            "financials": {
+                "capital_config": cfg.CAPITAL_TOTAL_CUENTA,
+                "margin_config": cfg.MARGEN_EN_USO_POR_OPERACION,
+                "risk_config": cfg.RIESGO_MAXIMO_PERMITIDO_USDT,
+                "ratio_config": cfg.RATIO_RIESGO_BENEFICIO,
+                "leverage": cfg.APALANCAMIENTO,
+            },
+            "history": state.history,
             "logs": state.recent_logs(since),
             "trigger_tf": cfg.TF_GATILLO,
             "zone_tf": cfg.TF_ZONA,
@@ -118,13 +125,48 @@ def create_app(engine, state, cfg, store) -> Flask:
         trade = state.trade
         ann: dict = {}
         if trade:
-            ann["trade"] = {k: trade.get(k) for k in ("side", "entry", "sl", "tp", "liq_price", "be_done")}
+            entry = float(trade.get("entry", 0) or 0)
+            sl = float(trade.get("sl", 0) or 0)
+            tp = float(trade.get("tp", 0) or 0)
+            qty = float(trade.get("qty", 0) or 0)
+            dist_sl = abs(entry - sl) if entry else 0
+            dist_tp = abs(tp - entry) if entry else 0
+            loss_sl_usdt = round(qty * dist_sl, 2) if (qty and dist_sl) else cfg.RIESGO_MAXIMO_PERMITIDO_USDT
+            gain_tp_usdt = round(qty * dist_tp, 2) if (qty and dist_tp) else round(loss_sl_usdt * cfg.RATIO_RIESGO_BENEFICIO, 2)
+            ann["trade"] = {
+                **{k: trade.get(k) for k in ("side", "entry", "sl", "tp", "liq_price", "be_done", "qty", "margin", "upnl", "r_now")},
+                "loss_sl_usdt": loss_sl_usdt,
+                "gain_tp_usdt": gain_tp_usdt,
+            }
+        else:
+            ep = (ev.get("execution_points") or {})
+            if ep and ep.get("target_price"):
+                target_p = float(ep["target_price"])
+                side = ep.get("side", "LONG")
+                atr = float(ev.get("atr", 0) or (target_p * 0.008))
+                dist = 1.5 * atr
+                sl_p = target_p - dist if side == "LONG" else target_p + dist
+                tp_p = target_p + dist * cfg.RATIO_RIESGO_BENEFICIO if side == "LONG" else target_p - dist * cfg.RATIO_RIESGO_BENEFICIO
+                ann["strategy_levels"] = {
+                    "strategy_id": cfg.ESTRATEGIA,
+                    "side": side,
+                    "target_price": target_p,
+                    "sl_price": round(sl_p, 1),
+                    "tp_price": round(tp_p, 1),
+                    "loss_sl_usdt": cfg.RIESGO_MAXIMO_PERMITIDO_USDT,
+                    "gain_tp_usdt": round(cfg.RIESGO_MAXIMO_PERMITIDO_USDT * cfg.RATIO_RIESGO_BENEFICIO, 2),
+                    "status_message": ep.get("message", ""),
+                }
         if ev.get("fib") and ev["fib"].get("valid"):
             ann["fib"] = ev["fib"]
         if ev.get("sr"):
             ann["sr"] = ev["sr"]
         if trade and trade.get("levels"):
             ann["levels"] = [{"price": lv["price"], "qty": lv["qty"], "filled": lv["filled"]} for lv in trade["levels"]]
+        ann["history_markers"] = [
+            {"time": h.get("entry_time") or h.get("close_time"), "close_time": h.get("close_time"), "side": h.get("side"), "entry": h.get("entry"), "exit": h.get("exit"), "net": h.get("net"), "reason": h.get("reason")}
+            for h in state.history if h.get("close_time")
+        ][-20:]
         data["annotations"] = ann
         data["tfs"] = CHART_TFS
         data["tf"] = tf

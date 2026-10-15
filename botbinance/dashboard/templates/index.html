@@ -20,6 +20,24 @@
     <span id="chipApi" class="chip" title="Conexión con la API de Binance">API</span>
     <span id="chipTg" class="chip" title="Telegram">Telegram</span>
   </div>
+  <div class="money-summary">
+    <div class="money-badge" title="Capital en cuenta (real o configurado)">
+      <span class="m-lbl">Capital Total</span>
+      <b id="topWallet" class="m-val">$100.00</b>
+    </div>
+    <div class="money-badge" id="mBadgeInPlay" title="Margen propio bloqueado en la operación activa">
+      <span class="m-lbl">En Juego (Margen)</span>
+      <b id="topMarginInUse" class="m-val">$0.00</b>
+    </div>
+    <div class="money-badge risk" title="Riesgo monetario si salta el Stop Loss">
+      <span class="m-lbl">En Riesgo (SL)</span>
+      <b id="topSlRisk" class="m-val neg">–$3.00</b>
+    </div>
+    <div class="money-badge profit" title="Beneficio monetario si toca el Take Profit">
+      <span class="m-lbl">Objetivo (TP)</span>
+      <b id="topTpTarget" class="m-val pos">+$9.00</b>
+    </div>
+  </div>
   <div class="price"><span id="price">–</span><small id="priceAge"></small></div>
   <div class="actions">
     <button id="btnPause" class="btn warn">Pausar</button>
@@ -31,6 +49,7 @@
 
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="panel">Panel</button>
+  <button class="tab" data-tab="historial">📜 Historial</button>
   <button class="tab" data-tab="config">⚙ Configuración</button>
   <button class="tab" data-tab="backtest">Backtest</button>
   <button class="tab" data-tab="logs">Registro</button>
@@ -74,18 +93,36 @@
       </div>
     </section>
 
-    <section class="card chartcard">
+    <section class="card chartcard" id="chartCardSection">
       <div class="cardhead">
-        <h2>Gráfico</h2>
-        <select id="tfSelect" aria-label="Temporalidad del gráfico" title="Temporalidad del gráfico"></select>
-        <div class="seg"><button id="zoomOut" title="Alejar" aria-label="Alejar">−</button><button id="zoomIn" title="Acercar" aria-label="Acercar">+</button></div>
-        <div class="legend">
-          <span class="lg l20">EMA20</span><span class="lg l50">EMA50</span><span class="lg l200">SMA200</span><span class="lg lbb">Bollinger</span>
+        <div class="row" style="align-items: center; gap: 8px;">
+          <h2>Gráfico de Velas y Barras</h2>
+          <select id="tfSelect" aria-label="Temporalidad del gráfico" title="Temporalidad del gráfico"></select>
+          <div class="seg"><button id="zoomOut" title="Alejar" aria-label="Alejar">−</button><button id="zoomIn" title="Acercar" aria-label="Acercar">+</button></div>
+        </div>
+        <div class="row" style="align-items: center; gap: 8px;">
+          <span class="muted" style="font-size: 11px;">Tamaño:</span>
+          <div class="seg" id="chartSizeSeg" title="Cambiar tamaño del gráfico">
+            <button type="button" data-size="sm">Chico</button>
+            <button type="button" data-size="md" class="on">Normal</button>
+            <button type="button" data-size="lg">Grande</button>
+            <button type="button" data-size="full" title="Expandir pantalla">⛶</button>
+          </div>
         </div>
       </div>
-      <div class="chartwrap"><canvas id="chart"></canvas><div id="tip" class="tip" hidden></div></div>
+      <div class="ind-bar">
+        <span class="muted" style="font-size: 11.5px; align-self: center; margin-right: 4px;">Indicadores y Estrategia:</span>
+        <button type="button" class="ind-pill on" data-ind="ema20"><span class="ind-dot l20"></span>EMA 20</button>
+        <button type="button" class="ind-pill on" data-ind="ema50"><span class="ind-dot l50"></span>EMA 50</button>
+        <button type="button" class="ind-pill on" data-ind="sma200"><span class="ind-dot l200"></span>SMA 200</button>
+        <button type="button" class="ind-pill on" data-ind="bb"><span class="ind-dot lbb"></span>Bollinger</button>
+        <button type="button" class="ind-pill on" data-ind="sr"><span class="ind-dot lsr"></span>Soportes/Res</button>
+        <button type="button" class="ind-pill on" data-ind="fib"><span class="ind-dot lfib"></span>Fibonacci</button>
+        <button type="button" class="ind-pill on" data-ind="strat"><span class="ind-dot lstrat"></span>Estrategia (SL/TP)</button>
+      </div>
+      <div class="chartwrap" id="chartWrap"><canvas id="chart"></canvas><div id="tip" class="tip" hidden></div></div>
       <small class="muted" id="tfRoles"></small><br>
-      <small class="muted">Ctrl + rueda (o botones +/−) = zoom · arrastrar = mover · doble clic = restablecer · líneas punteadas: S = soporte, R = resistencia</small>
+      <small class="muted">Ctrl + rueda (o botones +/−) = zoom · arrastrar = mover · doble clic = restablecer · líneas en el gráfico: Verde = Take Profit, Rojo = Stop Loss, Amarillo = Entrada/Estrategia</small>
     </section>
 
     <section class="card">
@@ -100,18 +137,69 @@
     </section>
 
     <section class="card">
-      <div class="cardhead"><h2>Posición</h2><button id="btnClose" class="btn danger small" hidden>Cerrar a mercado</button></div>
+      <div class="cardhead"><h2>Posición y Movimientos</h2><button id="btnClose" class="btn danger small" hidden>Cerrar a mercado</button></div>
       <div id="posBox" class="muted">Sin operación abierta.</div>
       <h3>Cuenta</h3>
       <div id="balBox" class="kv"></div>
-      <h3>Historial de operaciones EN VIVO (Testnet / Real)</h3>
-      <small class="muted" style="display:block;margin-bottom:6px;">Solo operaciones reales ejecutadas por el bot en vivo</small>
+      <h3>Últimas operaciones en vivo</h3>
+      <small class="muted" style="display:block;margin-bottom:6px;">Historial rápido (para el registro completo abre la pestaña 📜 Historial)</small>
       <div class="tablewrap"><table class="grid-table" id="histTable"><thead><tr><th>Cierre</th><th>Lado</th><th>Entrada $</th><th>Salida $</th><th>Neto USDT</th><th>Motivo</th></tr></thead><tbody></tbody></table></div>
     </section>
 
     <section class="card wide">
       <div class="cardhead"><h2>Tablero de diagnóstico financiero</h2></div>
       <pre id="board" class="board">Cargando…</pre>
+    </section>
+  </div>
+</main>
+
+<!-- ===================================================== HISTORIAL COMPLETO -->
+<main id="tab-historial" class="tabpane">
+  <div class="grid">
+    <section class="card wide">
+      <div class="cardhead">
+        <h2>📜 Historial Completo de Operaciones en Vivo</h2>
+        <div class="row" style="align-items: center; gap: 8px;">
+          <span class="muted">Filtrar:</span>
+          <div class="seg" id="histFilterSeg">
+            <button type="button" data-filter="all" class="on">Todas</button>
+            <button type="button" data-filter="win">Ganadoras</button>
+            <button type="button" data-filter="loss">Perdedoras</button>
+          </div>
+        </div>
+      </div>
+      <p class="muted">Registro auditable de cada orden ejecutada y cerrada en tiempo real por el bot (Testnet o Cuenta Real). No incluye simulaciones del pasado.</p>
+      
+      <div class="metrics" id="histMetrics">
+        <div class="metric"><b id="hmCount">0</b><span>Operaciones Totales</span></div>
+        <div class="metric"><b id="hmWinrate">0.0%</b><span>Tasa de Acierto (Winrate)</span></div>
+        <div class="metric"><b id="hmNet" class="pos">$0.00</b><span>Neto Acumulado USDT</span></div>
+        <div class="metric"><b id="hmAvgWin" class="pos">+$0.00</b><span>Ganancia Media</span></div>
+        <div class="metric"><b id="hmAvgLoss" class="neg">-$0.00</b><span>Pérdida Media</span></div>
+        <div class="metric"><b id="hmProfitFactor">0.00</b><span>Profit Factor</span></div>
+      </div>
+
+      <div class="tablewrap" style="max-height: 60vh; margin-top: 14px;">
+        <table class="grid-table" id="fullHistTable">
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Lado</th>
+              <th>Patrón / Estrategia</th>
+              <th>Entrada $</th>
+              <th>Salida $</th>
+              <th>Margen USDT</th>
+              <th>Neto USDT</th>
+              <th>Retorno (R)</th>
+              <th>Motivo de Salida</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="fullHistEmpty" class="note" style="margin-top: 12px; text-align: center;">
+        Aún no hay operaciones en vivo cerradas. Cuando el bot ejecute órdenes y cierre por Take Profit o Stop Loss, cada movimiento quedará registrado detalladamente aquí con su hora, precio y beneficio neto.
+      </div>
     </section>
   </div>
 </main>

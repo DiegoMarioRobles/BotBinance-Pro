@@ -51,7 +51,43 @@ document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () 
   document.querySelectorAll(".tabpane").forEach((p) => p.classList.toggle("active", p.id === "tab-" + b.dataset.tab));
   if (b.dataset.tab === "config" && !cfgLoaded) loadConfig();
   if (b.dataset.tab === "panel") chart.draw();
+  if (b.dataset.tab === "historial" && S) renderFullHistory(S);
 }));
+
+/* ------------------------------------------------------------------ controles del gráfico e indicadores */
+const indState = {
+  ema20: true,
+  ema50: true,
+  sma200: true,
+  bb: true,
+  sr: true,
+  fib: true,
+  strat: true
+};
+
+document.querySelectorAll(".ind-pill").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const ind = btn.dataset.ind;
+    if (ind && indState.hasOwnProperty(ind)) {
+      indState[ind] = !indState[ind];
+      btn.classList.toggle("on", indState[ind]);
+      chart.draw();
+    }
+  });
+});
+
+document.querySelectorAll("#chartSizeSeg button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#chartSizeSeg button").forEach((b) => b.classList.toggle("on", b === btn));
+    const sz = btn.dataset.size;
+    const wrap = $("chartWrap");
+    const sec = $("chartCardSection");
+    if (!wrap) return;
+    wrap.className = "chartwrap size-" + sz;
+    if (sec) sec.classList.toggle("full-expanded", sz === "full" || sz === "lg");
+    setTimeout(() => chart.draw(), 50);
+  });
+});
 
 /* ------------------------------------------------------------------ gráfico de velas */
 class Chart {
@@ -130,33 +166,39 @@ class Chart {
     }
     ctx.textBaseline = "middle";
     // zona Fibonacci
-    if (ann.fib) {
+    if (ann.fib && indState.fib) {
       const y1 = yOf(ann.fib.zone_hi), y2 = yOf(ann.fib.zone_lo);
       ctx.fillStyle = css("--accent"); ctx.globalAlpha = 0.12; ctx.fillRect(g.L, y1, pw, y2 - y1); ctx.globalAlpha = 1;
       ctx.fillStyle = css("--accent"); ctx.textAlign = "left"; ctx.fillText("Fib 50–61.8%", g.L + 4, y1 + 8);
     }
     // soportes / resistencias (pivotes del ZigZag)
-    for (const sr of (ann.sr || [])) {
-      if (sr.price < lo || sr.price > hi) continue;
-      const y = yOf(sr.price), col = sr.kind === "S" ? css("--up") : css("--down");
-      ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([1, 4]); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.globalAlpha = 0.9; ctx.fillStyle = col; ctx.textAlign = "left"; ctx.fillText(sr.kind + " " + num(sr.price, 0), g.L + 4, y - 6); ctx.globalAlpha = 1;
+    if (indState.sr) {
+      for (const sr of (ann.sr || [])) {
+        if (sr.price < lo || sr.price > hi) continue;
+        const y = yOf(sr.price), col = sr.kind === "S" ? css("--up") : css("--down");
+        ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([1, 4]); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.globalAlpha = 0.9; ctx.fillStyle = col; ctx.textAlign = "left"; ctx.fillText(sr.kind + " " + num(sr.price, 0), g.L + 4, y - 6); ctx.globalAlpha = 1;
+      }
     }
     // niveles de la martingala
-    (ann.levels || []).forEach((lv, k) => {
-      if (k === 0 || lv.price < lo || lv.price > hi) return;
-      const y = yOf(lv.price), col = css("--warn");
-      ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.setLineDash(lv.filled ? [] : [8, 4]); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = col; ctx.fillRect(g.W - g.R, y - 8, g.R - 2, 16); ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.fillText("N" + (k + 1) + (lv.filled ? "✔" : "") + " " + num(lv.price, 0), g.W - g.R + 3, y);
-    });
+    if (indState.strat) {
+      (ann.levels || []).forEach((lv, k) => {
+        if (k === 0 || lv.price < lo || lv.price > hi) return;
+        const y = yOf(lv.price), col = css("--warn");
+        ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.setLineDash(lv.filled ? [] : [8, 4]); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = col; ctx.fillRect(g.W - g.R, y - 8, g.R - 2, 16); ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.fillText("N" + (k + 1) + (lv.filled ? "✔" : "") + " " + num(lv.price, 0), g.W - g.R + 3, y);
+      });
+    }
     // bandas e indicadores
     const series = (arr, color, w, dash) => {
       ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
       for (let i = i0; i < i1; i++) { const v = arr[i]; if (v == null) { on = false; continue; } const x = xOf(i), y = yOf(v); on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; }
       ctx.stroke(); ctx.setLineDash([]);
     };
-    series(a.bb_up, css("--bb"), 1, [3, 3]); series(a.bb_low, css("--bb"), 1, [3, 3]);
-    series(a.sma200, css("--sma200"), 1.4); series(a.ema50, css("--ema50"), 1.2); series(a.ema20, css("--ema20"), 1.2);
+    if (indState.bb) { series(a.bb_up, css("--bb"), 1, [3, 3]); series(a.bb_low, css("--bb"), 1, [3, 3]); }
+    if (indState.sma200) series(a.sma200, css("--sma200"), 1.4);
+    if (indState.ema50) series(a.ema50, css("--ema50"), 1.2);
+    if (indState.ema20) series(a.ema20, css("--ema20"), 1.2);
     // velas + volumen
     const up = css("--up"), dn = css("--down"), vu = css("--vol-up"), vd = css("--vol-down");
     const cw = Math.max(1, bw * 0.7);
@@ -167,24 +209,45 @@ class Chart {
       const yo = yOf(o), yc = yOf(c); ctx.fillRect(x - cw / 2, Math.min(yo, yc), cw, Math.max(1, Math.abs(yo - yc)));
       ctx.fillStyle = isUp ? vu : vd; const vh = vmax ? a.volume[i] / vmax * volH : 0; ctx.fillRect(x - cw / 2, g.T + ph - vh, cw, vh);
     }
-    // marcadores de operaciones
-    for (const hst of ((this.d && this.d.history) || [])) {
-      for (let i = i0; i < i1; i++) {
-        if (hst.open_time >= a.open_time[i] && (i === this.n - 1 || hst.open_time < a.open_time[i + 1])) {
-          const long = hst.side === "LONG"; const x = xOf(i), y = long ? yOf(a.low[i]) + 10 : yOf(a.high[i]) - 10;
-          ctx.fillStyle = long ? up : dn; ctx.beginPath();
-          if (long) { ctx.moveTo(x, y - 7); ctx.lineTo(x - 5, y + 3); ctx.lineTo(x + 5, y + 3); } else { ctx.moveTo(x, y + 7); ctx.lineTo(x - 5, y - 3); ctx.lineTo(x + 5, y - 3); }
-          ctx.fill(); break;
+    // marcadores de operaciones en el gráfico
+    if (indState.strat) {
+      for (const hst of (ann.history_markers || (this.d && this.d.history) || [])) {
+        for (let i = i0; i < i1; i++) {
+          const tClose = hst.close_time || hst.time;
+          if (tClose >= a.open_time[i] && (i === this.n - 1 || tClose < a.open_time[i + 1])) {
+            const isWin = (hst.net || 0) >= 0;
+            const x = xOf(i), y = yOf(hst.exit || a.close[i]);
+            ctx.fillStyle = isWin ? up : dn; ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+            break;
+          }
         }
       }
     }
-    // líneas de la operación abierta
-    if (tr) {
-      const hl = (p, col, lab, dash) => {
-        if (!p) return; const y = yOf(p); ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = col; ctx.fillRect(g.W - g.R, y - 8, g.R - 2, 16); ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.fillText(lab + " " + num(p, 0), g.W - g.R + 3, y);
+    // líneas de la operación abierta o niveles proyectados de la estrategia
+    if (tr && indState.strat) {
+      const hl = (p, col, lab, sub, dash) => {
+        if (!p || p < lo || p > hi) return; const y = yOf(p); ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = col; ctx.fillRect(g.W - g.R - 2, y - 9, g.R + 4, 18);
+        ctx.fillStyle = "#111"; ctx.font = "bold 9.5px Consolas, monospace"; ctx.textAlign = "left"; ctx.fillText(lab + " " + num(p, 0), g.W - g.R + 2, y - 1);
+        if (sub) { ctx.font = "8.5px Consolas, monospace"; ctx.fillText(sub, g.W - g.R + 2, y + 7); }
       };
-      hl(tr.entry, css("--text"), "ENT", [6, 4]); hl(tr.sl, dn, tr.be_done ? "BE" : "SL", [6, 4]); hl(tr.tp, up, "TP", [6, 4]); hl(tr.liq_price, css("--warn"), "LIQ", [2, 4]);
+      hl(tr.entry, css("--accent"), "ENTRADA", tr.margin ? "$" + num(tr.margin, 0) + " M" : "", [4, 4]);
+      hl(tr.sl, dn, tr.be_done ? "BE" : "STOP LOSS", tr.loss_sl_usdt ? "-$" + num(tr.loss_sl_usdt, 2) : "", [4, 4]);
+      hl(tr.tp, up, "TAKE PROFIT", tr.gain_tp_usdt ? "+$" + num(tr.gain_tp_usdt, 2) : "", [4, 4]);
+      if (tr.liq_price) hl(tr.liq_price, css("--warn"), "LIQ", "", [2, 4]);
+    } else if (ann.strategy_levels && indState.strat) {
+      const st = ann.strategy_levels;
+      const hl = (p, col, lab, sub, dash) => {
+        if (!p || p < lo || p > hi) return; const y = yOf(p); ctx.strokeStyle = col; ctx.lineWidth = 1.3; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = col; ctx.fillRect(g.W - g.R - 2, y - 9, g.R + 4, 18);
+        ctx.fillStyle = "#111"; ctx.font = "bold 9.5px Consolas, monospace"; ctx.textAlign = "left"; ctx.fillText(lab + " " + num(p, 0), g.W - g.R + 2, y - 1);
+        if (sub) { ctx.font = "8.5px Consolas, monospace"; ctx.fillText(sub, g.W - g.R + 2, y + 7); }
+      };
+      hl(st.target_price, "#29b6f6", "EJECUCIÓN", "Objetivo", [4, 4]);
+      hl(st.sl_price, "rgba(239,83,80,0.85)", "SL Est.", "-$" + num(st.loss_sl_usdt, 2), [3, 4]);
+      hl(st.tp_price, "rgba(38,166,154,0.85)", "TP Est.", "+$" + num(st.gain_tp_usdt, 2), [3, 4]);
     }
     // último precio
     const last = a.close[this.n - 1];
@@ -256,6 +319,45 @@ function render(s) {
   const tg = s.telegram; chip($("chipTg"), tg.linked ? (tg.ok === false ? "Telegram ✘" : "Telegram ✔") : tg.token ? "Telegram sin vincular" : "Telegram off", tg.linked ? (tg.ok === false ? "bad" : "ok") : tg.token ? "warn" : "");
   $("price").textContent = s.price ? usd(s.price) : "–"; $("priceAge").textContent = s.price_age != null ? "hace " + Math.round(s.price_age) + " s" : "";
   $("btnPause").hidden = s.paused; $("btnResume").hidden = !s.paused;
+
+  // resumen financiero en encabezado
+  const fin = s.financials || {};
+  const walletAmt = s.balance && s.balance.wallet != null ? s.balance.wallet : (fin.capital_config || 100);
+  const topW = $("topWallet"); if (topW) topW.textContent = usd(walletAmt, 2);
+
+  const topM = $("topMarginInUse");
+  const topSL = $("topSlRisk");
+  const topTP = $("topTpTarget");
+  const mb = $("mBadgeInPlay");
+
+  if (s.trade) {
+    const tr = s.trade;
+    if (topM) topM.textContent = usd(tr.margin || fin.margin_config || 20, 2);
+    const slLoss = tr.loss_sl_usdt != null ? tr.loss_sl_usdt : (fin.risk_config || 3.0);
+    const tpGain = tr.gain_tp_usdt != null ? tr.gain_tp_usdt : (slLoss * (fin.ratio_config || 3.0));
+    if (topSL) {
+      topSL.textContent = "–" + usd(slLoss, 2);
+      topSL.title = "SL en " + (tr.sl ? usd(tr.sl, 1) : "–") + (tr.be_done ? " (Break-even activo)" : "");
+    }
+    if (topTP) {
+      topTP.textContent = "+" + usd(tpGain, 2);
+      topTP.title = "TP en " + (tr.tp ? usd(tr.tp, 1) : "–");
+    }
+    if (mb) mb.classList.add("highlight");
+  } else {
+    if (topM) topM.textContent = "$0.00";
+    const slPlan = fin.risk_config || 3.0;
+    const tpPlan = slPlan * (fin.ratio_config || 3.0);
+    if (topSL) {
+      topSL.textContent = "–" + usd(slPlan, 2);
+      topSL.title = "Riesgo presupuestado ante Stop Loss";
+    }
+    if (topTP) {
+      topTP.textContent = "+" + usd(tpPlan, 2);
+      topTP.title = "Ganancia objetivo presupuestada ante Take Profit (Ratio 1:3)";
+    }
+    if (mb) mb.classList.remove("highlight");
+  }
 
   const al = $("alerts"); al.replaceChildren();
   if (s.fatal) al.append(h("div", { class: "alert error", text: s.fatal }));
@@ -331,6 +433,68 @@ function render(s) {
   // configuración (partes vivas)
   $("ipBox").textContent = s.public_ip || "–";
   renderTelegram(s); renderBacktest(s);
+  renderFullHistory(s);
+}
+
+/* ------------------------------------------------------------------ pestaña historial completo */
+let histFilter = "all";
+document.querySelectorAll("#histFilterSeg button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("#histFilterSeg button").forEach((x) => x.classList.toggle("on", x === b));
+  histFilter = b.dataset.filter || "all";
+  if (S) renderFullHistory(S);
+}));
+
+function renderFullHistory(s) {
+  if (!s) return;
+  const all = [...(s.history || [])].reverse();
+  const filtered = all.filter((x) => {
+    if (histFilter === "win") return (x.net || 0) > 0;
+    if (histFilter === "loss") return (x.net || 0) < 0;
+    return true;
+  });
+
+  const total = all.length;
+  const wins = all.filter((x) => (x.net || 0) > 0);
+  const losses = all.filter((x) => (x.net || 0) < 0);
+  const winCount = wins.length;
+  const winrate = total ? (winCount / total * 100).toFixed(1) : "0.0";
+  const netSum = all.reduce((acc, x) => acc + (x.net || 0), 0);
+  const winSum = wins.reduce((acc, x) => acc + (x.net || 0), 0);
+  const lossSum = Math.abs(losses.reduce((acc, x) => acc + (x.net || 0), 0));
+  const avgWin = wins.length ? (winSum / wins.length).toFixed(2) : "0.00";
+  const avgLoss = losses.length ? (lossSum / losses.length).toFixed(2) : "0.00";
+  const pf = lossSum > 0 ? (winSum / lossSum).toFixed(2) : (winSum > 0 ? "∞" : "0.00");
+
+  const hmC = $("hmCount"), hmW = $("hmWinrate"), hmN = $("hmNet");
+  const hmAW = $("hmAvgWin"), hmAL = $("hmAvgLoss"), hmPF = $("hmProfitFactor");
+  if (hmC) hmC.textContent = total;
+  if (hmW) hmW.textContent = winrate + "%";
+  if (hmN) { hmN.textContent = signed(netSum, 2) + " USDT"; hmN.className = clsSign(netSum); }
+  if (hmAW) hmAW.textContent = "+" + usd(avgWin, 2);
+  if (hmAL) hmAL.textContent = "-" + usd(avgLoss, 2);
+  if (hmPF) hmPF.textContent = pf;
+
+  const fullTable = $("fullHistTable");
+  if (fullTable) {
+    const tb = fullTable.querySelector("tbody");
+    tb.replaceChildren();
+    for (const x of filtered) {
+      const dt = new Date(x.close_time || x.entry_time || Date.now());
+      tb.append(h("tr", {},
+        h("td", { text: dt.toLocaleString("es", { hour12: false }) }),
+        h("td", { text: x.side || "–" }),
+        h("td", { text: x.pattern || "Estrategia 1" }),
+        h("td", { text: usd(x.entry, 1) }),
+        h("td", { text: usd(x.exit, 1) }),
+        h("td", { text: x.margin ? usd(x.margin, 1) : "–" }),
+        h("td", { class: clsSign(x.net), text: signed(x.net, 2) + " USDT" }),
+        h("td", { class: clsSign(x.r), text: signed(x.r, 2) + " R" }),
+        h("td", { text: x.reason || "–" })
+      ));
+    }
+  }
+  const empty = $("fullHistEmpty");
+  if (empty) empty.hidden = total > 0;
 }
 
 let polling = false;
