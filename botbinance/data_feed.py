@@ -59,8 +59,14 @@ def resample(df_base: pd.DataFrame, tf: str) -> pd.DataFrame:
 
 def series_of(df: pd.DataFrame, n: int) -> dict:
     d = df.tail(n)
-    cols = ["open_time", "open", "high", "low", "close", "volume", "ema20", "ema50", "sma200", "bb_up", "bb_low"]
-    return {c: [None if pd.isna(v) else float(v) for v in d[c]] for c in cols}
+    cols = ["open_time", "open", "high", "low", "close", "volume", "ema20", "ema50", "sma200", "bb_mid", "bb_up", "bb_low", "rsi14"]
+    res = {}
+    for c in cols:
+        if c in d.columns:
+            res[c] = [None if pd.isna(v) else float(v) for v in d[c]]
+        else:
+            res[c] = [None] * len(d)
+    return res
 
 
 class DataFeed:

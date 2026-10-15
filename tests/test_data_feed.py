@@ -95,3 +95,17 @@ def test_merge_keeps_order_and_caps_length():
     ot = feed.raw["1h"]["open_time"]
     assert ot.is_monotonic_increasing and ot.is_unique and len(ot) == 75
     assert not feed._merge("1h", new)                # nada nuevo
+
+
+def test_series_of_includes_bb_mid_and_rsi14():
+    from botbinance.data_feed import series_of
+    feed, _, _ = make_feed(80)
+    df = feed.frames["1h"]
+    series = series_of(df, 30)
+    assert "bb_mid" in series
+    assert "rsi14" in series
+    assert "bb_up" in series
+    assert "bb_low" in series
+    assert len(series["rsi14"]) == 30
+    assert len(series["bb_mid"]) == 30
+

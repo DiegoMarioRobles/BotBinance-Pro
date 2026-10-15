@@ -57,14 +57,39 @@ document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () 
 
 /* ------------------------------------------------------------------ controles del gráfico e indicadores */
 const indState = {
-  ema20: true,
-  ema50: true,
-  sma200: true,
+  ema20: false,
+  ema50: false,
+  sma200: false,
   bb: true,
-  sr: true,
-  fib: true,
+  rsi: true,
+  sr: false,
+  fib: false,
   strat: true
 };
+
+const STRATEGY_INDICATORS = {
+  estrategia_1: ["bb", "rsi", "strat"],
+  estrategia_2: ["ema20", "ema50", "sma200", "fib", "strat"],
+  estrategia_3: ["bb", "strat"],
+  estrategia_4: ["ema20", "ema50", "strat"],
+  estrategia_5: ["rsi", "sr", "strat"]
+};
+
+let currentActiveStrategy = null;
+
+function applyStrategyIndicators(strategyId) {
+  const allowed = STRATEGY_INDICATORS[strategyId] || ["bb", "rsi", "strat"];
+  for (const k of Object.keys(indState)) {
+    indState[k] = allowed.includes(k);
+  }
+  document.querySelectorAll(".ind-pill").forEach((btn) => {
+    const ind = btn.dataset.ind;
+    if (ind && indState.hasOwnProperty(ind)) {
+      btn.classList.toggle("on", indState[ind]);
+    }
+  });
+  if (window.chart) chart.draw();
+}
 
 document.querySelectorAll(".ind-pill").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -76,6 +101,14 @@ document.querySelectorAll(".ind-pill").forEach((btn) => {
     }
   });
 });
+
+const btnSyncStrat = $("btnSyncStratInds");
+if (btnSyncStrat) {
+  btnSyncStrat.onclick = () => {
+    applyStrategyIndicators(currentActiveStrategy || (S && S.strategy) || "estrategia_1");
+    toast("Indicadores configurados para la estrategia activa", "ok");
+  };
+}
 
 document.querySelectorAll("#chartSizeSeg button").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -107,10 +140,13 @@ class Chart {
   setData(d, resetView) {
     this.d = d; const s = d.series;
     if (!s) { this.n = 0; this.draw(); return; }
-    const keys = ["open_time", "open", "high", "low", "close", "volume", "ema20", "ema50", "sma200", "bb_up", "bb_low"];
-    const a = {}; keys.forEach((k) => (a[k] = s[k].slice()));
+    const keys = ["open_time", "open", "high", "low", "close", "volume", "ema20", "ema50", "sma200", "bb_mid", "bb_up", "bb_low", "rsi14"];
+    const a = {}; keys.forEach((k) => (a[k] = (s[k] || []).slice()));
     const f = d.forming;
-    if (f) { a.open_time.push(f.open_time); a.open.push(f.open); a.high.push(f.high); a.low.push(f.low); a.close.push(f.close); a.volume.push(f.volume);["ema20", "ema50", "sma200", "bb_up", "bb_low"].forEach((k) => a[k].push(null)); }
+    if (f) {
+      a.open_time.push(f.open_time); a.open.push(f.open); a.high.push(f.high); a.low.push(f.low); a.close.push(f.close); a.volume.push(f.volume);
+      ["ema20", "ema50", "sma200", "bb_mid", "bb_up", "bb_low", "rsi14"].forEach((k) => a[k].push(null));
+    }
     this.a = a; this.n = a.open_time.length;
     if (resetView) { this.count = Math.min(120, this.n); this.offset = 0; }
     this.draw();
@@ -142,7 +178,11 @@ class Chart {
     const ctx = this.ctx; const g = this.geo(); ctx.clearRect(0, 0, g.W, g.H);
     if (!this.n || !this.a) { ctx.fillStyle = css("--muted"); ctx.font = "14px sans-serif"; ctx.fillText("Cargando velas…", 20, 30); return; }
     const a = this.a; const [i0, i1] = this.range(); const vis = i1 - i0;
-    const pw = g.W - g.L - g.R, ph = g.H - g.T - g.B, volH = ph * 0.16, priceH = ph - volH - 6;
+    const pw = g.W - g.L - g.R, ph = g.H - g.T - g.B;
+    const hasRsi = !!(indState.rsi && a.rsi14 && a.rsi14.length);
+    const rsiH = hasRsi ? Math.min(105, Math.max(68, Math.round(ph * 0.23))) : 0;
+    const volH = Math.round((ph - rsiH) * 0.15);
+    const priceH = ph - rsiH - volH - (hasRsi ? 16 : 6);
     const bw = pw / this.count; const xOf = (i) => g.L + (i - i0 + 0.5) * bw;
     let lo = Infinity, hi = -Infinity, vmax = 0;
     for (let i = i0; i < i1; i++) { lo = Math.min(lo, a.low[i]); hi = Math.max(hi, a.high[i]); vmax = Math.max(vmax, a.volume[i]); }
@@ -219,26 +259,52 @@ class Chart {
         ctx.fillStyle = col; ctx.fillRect(g.W - g.R, y - 8, g.R - 2, 16); ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.fillText("N" + (k + 1) + (lv.filled ? "✔" : "") + " " + num(lv.price, 0), g.W - g.R + 3, y);
       });
     }
-    // bandas e indicadores
+    // bandas e indicadores de precio
     const series = (arr, color, w, dash) => {
       ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); let on = false;
-      for (let i = i0; i < i1; i++) { const v = arr[i]; if (v == null) { on = false; continue; } const x = xOf(i), y = yOf(v); on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; }
+      for (let i = i0; i < i1; i++) { const v = arr[i]; if (v == null || isNaN(v)) { on = false; continue; } const x = xOf(i), y = yOf(v); on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; }
       ctx.stroke(); ctx.setLineDash([]);
     };
-    if (indState.bb) { series(a.bb_up, css("--bb"), 1, [3, 3]); series(a.bb_low, css("--bb"), 1, [3, 3]); }
-    if (indState.sma200) series(a.sma200, css("--sma200"), 1.4);
-    if (indState.ema50) series(a.ema50, css("--ema50"), 1.2);
-    if (indState.ema20) series(a.ema20, css("--ema20"), 1.2);
+    if (indState.bb && a.bb_up && a.bb_low) {
+      // Sombreado de canal de Bollinger
+      ctx.save();
+      ctx.fillStyle = "rgba(41, 182, 246, 0.08)";
+      ctx.beginPath();
+      let bbInit = false;
+      for (let i = i0; i < i1; i++) {
+        const v = a.bb_up[i];
+        if (v == null || isNaN(v)) continue;
+        const x = xOf(i), y = yOf(v);
+        if (!bbInit) { ctx.moveTo(x, y); bbInit = true; } else { ctx.lineTo(x, y); }
+      }
+      for (let i = i1 - 1; i >= i0; i--) {
+        const v = a.bb_low[i];
+        if (v == null || isNaN(v)) continue;
+        ctx.lineTo(xOf(i), yOf(v));
+      }
+      if (bbInit) { ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+
+      series(a.bb_up, "#29b6f6", 1.4);
+      if (a.bb_mid) series(a.bb_mid, "rgba(41, 182, 246, 0.6)", 1.0, [4, 4]);
+      series(a.bb_low, "#29b6f6", 1.4);
+    }
+    if (indState.sma200 && a.sma200) series(a.sma200, css("--sma200"), 1.4);
+    if (indState.ema50 && a.ema50) series(a.ema50, css("--ema50"), 1.2);
+    if (indState.ema20 && a.ema20) series(a.ema20, css("--ema20"), 1.2);
+
     // velas + volumen
     const up = css("--up"), dn = css("--down"), vu = css("--vol-up"), vd = css("--vol-down");
     const cw = Math.max(1, bw * 0.7);
+    const volBaseY = g.T + priceH + 4 + volH;
     for (let i = i0; i < i1; i++) {
       const o = a.open[i], c = a.close[i], x = xOf(i), isUp = c >= o;
       ctx.strokeStyle = ctx.fillStyle = isUp ? up : dn; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, yOf(a.high[i])); ctx.lineTo(x, yOf(a.low[i])); ctx.stroke();
       const yo = yOf(o), yc = yOf(c); ctx.fillRect(x - cw / 2, Math.min(yo, yc), cw, Math.max(1, Math.abs(yo - yc)));
-      ctx.fillStyle = isUp ? vu : vd; const vh = vmax ? a.volume[i] / vmax * volH : 0; ctx.fillRect(x - cw / 2, g.T + ph - vh, cw, vh);
+      ctx.fillStyle = isUp ? vu : vd; const vh = vmax ? a.volume[i] / vmax * volH : 0; ctx.fillRect(x - cw / 2, volBaseY - vh, cw, vh);
     }
+
     // marcadores de operaciones en el gráfico
     if (indState.strat) {
       for (const hst of (ann.history_markers || (this.d && this.d.history) || [])) {
@@ -286,6 +352,75 @@ class Chart {
       ctx.strokeStyle = col; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(g.L, y); ctx.lineTo(g.W - g.R, y); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = col; ctx.fillRect(g.W - g.R, y - 8, g.R - 2, 16); ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.fillText(num(last, 1), g.W - g.R + 3, y);
     }
+
+    // Subpanel de RSI (14)
+    if (hasRsi) {
+      const rsiTopY = g.T + priceH + volH + 12;
+      const yRsi = (v) => rsiTopY + (100 - Math.max(0, Math.min(100, v))) / 100 * rsiH;
+
+      // Línea divisoria del panel de RSI
+      ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.L, rsiTopY - 4); ctx.lineTo(g.W - g.R, rsiTopY - 4); ctx.stroke();
+
+      // Zona sombreada entre nivel 20 y 80
+      ctx.fillStyle = "rgba(179, 136, 255, 0.05)";
+      ctx.fillRect(g.L, yRsi(80), pw, yRsi(20) - yRsi(80));
+
+      // Nivel 80 (Sobrecompra)
+      ctx.strokeStyle = "rgba(239, 83, 80, 0.65)"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(g.L, yRsi(80)); ctx.lineTo(g.W - g.R, yRsi(80)); ctx.stroke();
+      ctx.fillStyle = css("--down"); ctx.font = "9.5px Consolas, monospace"; ctx.textAlign = "left";
+      ctx.fillText("80 Sobrecompra", g.W - g.R + 4, yRsi(80));
+
+      // Nivel 50 (Centro)
+      ctx.strokeStyle = "rgba(139, 152, 169, 0.3)"; ctx.setLineDash([2, 4]);
+      ctx.beginPath(); ctx.moveTo(g.L, yRsi(50)); ctx.lineTo(g.W - g.R, yRsi(50)); ctx.stroke();
+      ctx.fillStyle = text; ctx.fillText("50", g.W - g.R + 4, yRsi(50));
+
+      // Nivel 20 (Sobreventa - Condición Gatillo de Estrategia 1)
+      ctx.strokeStyle = "rgba(38, 166, 154, 0.85)"; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(g.L, yRsi(20)); ctx.lineTo(g.W - g.R, yRsi(20)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = css("--up"); ctx.font = "bold 9.5px Consolas, monospace";
+      ctx.fillText("20 Sobreventa", g.W - g.R + 4, yRsi(20));
+
+      // Curva del oscilador RSI (14)
+      ctx.strokeStyle = "#b388ff"; ctx.lineWidth = 1.8; ctx.beginPath();
+      let rsiStarted = false;
+      for (let i = i0; i < i1; i++) {
+        const val = a.rsi14[i];
+        if (val == null || isNaN(val)) { rsiStarted = false; continue; }
+        const x = xOf(i), y = yRsi(val);
+        rsiStarted ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        rsiStarted = true;
+      }
+      ctx.stroke();
+
+      // Puntos destacados cuando RSI < 20 (Gatillo)
+      ctx.fillStyle = css("--up");
+      for (let i = i0; i < i1; i++) {
+        const val = a.rsi14[i];
+        if (val != null && val < 20) {
+          const x = xOf(i), y = yRsi(val);
+          ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // Encabezado del oscilador con valor actual
+      const lastRsi = a.rsi14[this.n - 1];
+      ctx.font = "bold 11px system-ui, sans-serif";
+      ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      let rsiTxt = "RSI (14): " + (lastRsi != null ? lastRsi.toFixed(1) : "–");
+      if (lastRsi != null && lastRsi < 20) {
+        ctx.fillStyle = css("--up");
+        rsiTxt += "  ⚡ SOBREVENTA < 20 (Condición Gatillo cumplida)";
+      } else if (lastRsi != null && lastRsi > 80) {
+        ctx.fillStyle = css("--down");
+        rsiTxt += "  ⚠ SOBRECOMPRA > 80";
+      } else {
+        ctx.fillStyle = "#b388ff";
+      }
+      ctx.fillText(rsiTxt, g.L + 8, rsiTopY - 2);
+    }
+
     // cursor y tooltip
     const m = this.mouse;
     if (m && m.x > g.L && m.x < g.W - g.R && m.y > g.T && m.y < g.H - g.B) {
@@ -293,7 +428,25 @@ class Chart {
       const i = Math.min(i1 - 1, Math.max(i0, Math.floor(i0 + (m.x - g.L) / bw)));
       const f = (v, nd) => v == null ? "–" : num(v, nd === undefined ? 1 : nd);
       const dt = new Date(a.open_time[i]);
-      this.tip.textContent = `${dt.toLocaleString("es", { hour12: false })}  (UTC ${dt.toISOString().slice(5, 16).replace("T", " ")})\nO ${f(a.open[i])}  H ${f(a.high[i])}\nL ${f(a.low[i])}  C ${f(a.close[i])}\nVol ${f(a.volume[i], 1)}\nEMA20 ${f(a.ema20[i])}  EMA50 ${f(a.ema50[i])}\nSMA200 ${f(a.sma200[i])}\nBB ${f(a.bb_low[i])} – ${f(a.bb_up[i])}`;
+      let lines = [
+        `${dt.toLocaleString("es", { hour12: false })}  (UTC ${dt.toISOString().slice(5, 16).replace("T", " ")})`,
+        `O ${f(a.open[i])}  H ${f(a.high[i])}`,
+        `L ${f(a.low[i])}  C ${f(a.close[i])}`,
+        `Vol ${f(a.volume[i], 1)}`
+      ];
+      if (indState.rsi && a.rsi14 && a.rsi14[i] != null) {
+        lines.push(`RSI(14): ${f(a.rsi14[i], 1)}${a.rsi14[i] < 20 ? " (Sobreventa < 20 ✔)" : ""}`);
+      }
+      if (indState.bb && a.bb_up && a.bb_up[i] != null) {
+        lines.push(`BB Inf: ${f(a.bb_low[i])}  Med: ${f(a.bb_mid ? a.bb_mid[i] : null)}  Sup: ${f(a.bb_up[i])}`);
+      }
+      if (indState.ema20 && a.ema20 && a.ema20[i] != null) {
+        lines.push(`EMA20: ${f(a.ema20[i])}${indState.ema50 && a.ema50 ? "  EMA50: " + f(a.ema50[i]) : ""}`);
+      }
+      if (indState.sma200 && a.sma200 && a.sma200[i] != null) {
+        lines.push(`SMA200: ${f(a.sma200[i])}`);
+      }
+      this.tip.textContent = lines.join("\n");
       this.tip.hidden = false; this.tip.style.left = Math.min(m.x + 14, g.W - 250) + "px"; this.tip.style.top = Math.max(4, m.y - 90) + "px";
     } else this.tip.hidden = true;
   }
@@ -454,6 +607,11 @@ function render(s) {
   badge($("ph2Badge"), ev.phase2_ok === undefined ? null : ev.phase2_ok); badge($("ph3Badge"), ev.phase3_ok === undefined ? null : ev.phase3_ok);
 
   // estrategia y puntos de ejecución
+  // estrategia y puntos de ejecución
+  if (s.strategy && s.strategy !== currentActiveStrategy) {
+    currentActiveStrategy = s.strategy;
+    applyStrategyIndicators(s.strategy);
+  }
   if (s.strategy_info) {
     const sb = $("stratBadge"), st = $("stratTitle"), sd = $("stratDesc");
     if (sb) sb.textContent = s.strategy_info.name || "Estrategia 1";
@@ -477,8 +635,62 @@ function render(s) {
     }
   }
 
+  // Letrero llamativo de estado de la operación (Rojo = Sin Operación / Verde = Operación en Curso)
+  const banner = $("opStatusBanner");
+  const bBadgeText = $("opBannerBadgeText");
+  const bHeadline = $("opBannerHeadline");
+  const bMetrics = $("opBannerMetrics");
+  const bAction = $("opBannerAction");
+  const tr = s.trade;
+
+  if (banner && bBadgeText && bHeadline && bMetrics) {
+    bMetrics.replaceChildren();
+    const makePill = (lbl, val, cls) => {
+      const p = h("div", { class: "op-metric-pill" });
+      p.append(h("span", { class: "op-metric-lbl", text: lbl }));
+      p.append(h("b", { class: "op-metric-val " + (cls || ""), text: val }));
+      return p;
+    };
+    if (tr) {
+      banner.className = "op-status-banner active";
+      bBadgeText.textContent = "OPERACIÓN EN CURSO · " + tr.side + " " + (s.symbol || "BTC/USDT") + " (" + (tr.leverage || fin.leverage || 5) + "x)";
+      bHeadline.textContent = "Patrón: " + (tr.pattern || "Estrategia") + (tr.be_done ? " · Break-even activo (SL en entrada)" : "");
+      if (bAction) bAction.hidden = false;
+      bMetrics.append(makePill("Entrada", usd(tr.entry, 1)));
+      bMetrics.append(makePill("Precio Marca", usd(tr.mark || s.price, 1)));
+      bMetrics.append(makePill("PnL No Realizado", signed(tr.upnl, 2) + " USDT (" + signed(tr.r_now, 2) + " R)", clsSign(tr.upnl)));
+      bMetrics.append(makePill("Stop Loss", usd(tr.sl, 1) + (tr.loss_sl_usdt ? " [-$" + num(tr.loss_sl_usdt, 2) + "]" : "")));
+      bMetrics.append(makePill("Take Profit", usd(tr.tp, 1) + (tr.gain_tp_usdt ? " [+$" + num(tr.gain_tp_usdt, 2) + "]" : "")));
+      bMetrics.append(makePill("Margen Propio", usd(tr.margin || fin.margin_config || 20, 1)));
+    } else if (s.position) {
+      banner.className = "op-status-banner active";
+      bBadgeText.textContent = "POSICIÓN EXTERNA ACTIVA · " + num(s.position.amt, 4) + " BTC";
+      bHeadline.textContent = "Posición detectada en la cuenta de Binance ajena al bot";
+      if (bAction) bAction.hidden = false;
+      bMetrics.append(makePill("Entrada", usd(s.position.entry, 1)));
+      bMetrics.append(makePill("Precio Marca", usd(s.price, 1)));
+      bMetrics.append(makePill("PnL No Realizado", signed(s.position.upnl, 2) + " USDT", clsSign(s.position.upnl)));
+    } else {
+      banner.className = "op-status-banner idle";
+      bBadgeText.textContent = "SIN OPERACIÓN ACTIVA";
+      const stratName = s.strategy_info ? (s.strategy_info.short_name || s.strategy_info.name) : "Estrategia";
+      bHeadline.textContent = "Monitoreando mercado en tiempo real · Buscando señal de entrada según " + stratName;
+      if (bAction) bAction.hidden = true;
+      bMetrics.append(makePill("Precio BTC", s.price ? usd(s.price, 1) : "–"));
+      if (ep && ep.target_price) {
+        bMetrics.append(makePill("Gatillo Precio (BB Inf)", usd(ep.target_price, 1)));
+      }
+      if (ep && ep.current_rsi != null) {
+        const rsiTarget = ep.target_rsi != null ? "< " + ep.target_rsi : "< 20";
+        bMetrics.append(makePill("RSI Actual", num(ep.current_rsi, 1) + " (Gatillo " + rsiTarget + ")", ep.current_rsi < 20 ? "pos" : ""));
+      }
+      const phState = ev.phase3_ok ? "Fase 3: Gatillo cumplido ✔" : (ev.phase2_ok ? "Fase 2 cumplida · Esperando gatillo" : (ev.phase1_ok ? "Fase 1: Tendencia confirmada" : "Fase 1: Evaluando tendencia"));
+      bMetrics.append(makePill("Estado Fases", phState));
+    }
+  }
+
   // posición
-  const pb = $("posBox"); const tr = s.trade; $("btnClose").hidden = !(tr || s.position);
+  const pb = $("posBox"); $("btnClose").hidden = !(tr || s.position);
   if (tr) {
     pb.className = "kv";
     kv(pb, [["Lado", tr.side, tr.side === "LONG" ? "pos" : "neg"], ["Entrada", usd(tr.entry)], ["Cantidad", tr.qty + " BTC"], ["Marca", usd(tr.mark)],
@@ -596,6 +808,7 @@ $("btnClose").onclick = async () => {
     const r = await api("/api/close_position", {}); toast(r.message, "ok"); poll();
   }
 };
+if ($("btnBannerClose")) $("btnBannerClose").onclick = () => $("btnClose").click();
 
 /* ------------------------------------------------------------------ configuración */
 const TREND = ["4h", "8h", "12h", "16h", "20h", "1d", "2d", "3d", "1w", "1M"];
@@ -707,10 +920,16 @@ async function loadConfig() {
         topSel.append(h("option", { value: id, text: info.name + (descText ? " — " + descText : "") }));
       }
       topSel.onchange = async () => {
+        currentActiveStrategy = topSel.value;
+        applyStrategyIndicators(topSel.value);
         await applyConfig({ ESTRATEGIA: topSel.value });
       };
     }
-    if (topSel && c.active_strategy) topSel.value = c.active_strategy;
+    if (topSel && c.active_strategy) {
+      topSel.value = c.active_strategy;
+      currentActiveStrategy = c.active_strategy;
+      applyStrategyIndicators(c.active_strategy);
+    }
     if (btSel && !btSel.options.length) {
       for (const [id, info] of Object.entries(c.strategies)) {
         const descText = info.desc || info.description || "";

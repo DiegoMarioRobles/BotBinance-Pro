@@ -53,6 +53,7 @@ STRATEGIES = {
         "short_name": "Estrategia 1 (RSI < 20 + BB)",
         "desc": "Tendencia en 1d/12h + Retroceso con RSI < 20 y vela tocando Banda Inferior de Bollinger en 15m/30m.",
         "default_tfs": {"TF_TENDENCIA": "1d", "TF_TENDENCIA_SUPERIOR": "1w", "TF_ZONA": "15m", "TF_GATILLO": "15m"},
+        "indicators": ["bb", "rsi", "strat"],
     },
     "estrategia_2": {
         "id": "estrategia_2",
@@ -60,6 +61,7 @@ STRATEGIES = {
         "short_name": "Estrategia 2 (Pullback & Fib)",
         "desc": "Tendencia 1d + Retroceso a zona EMA20/50 o Fibonacci 50-61.8% en 4h + Gatillo de acción del precio en 1h.",
         "default_tfs": {"TF_TENDENCIA": "1d", "TF_TENDENCIA_SUPERIOR": "1w", "TF_ZONA": "4h", "TF_GATILLO": "1h"},
+        "indicators": ["ema20", "ema50", "sma200", "fib", "strat"],
     },
     "estrategia_3": {
         "id": "estrategia_3",
@@ -67,6 +69,7 @@ STRATEGIES = {
         "short_name": "Estrategia 3 (Squeeze Breakout)",
         "desc": "Compresión de volatilidad (Bandas de Bollinger estrechas) y ruptura direccional explosiva con volumen.",
         "default_tfs": {"TF_TENDENCIA": "1d", "TF_TENDENCIA_SUPERIOR": "1w", "TF_ZONA": "4h", "TF_GATILLO": "1h"},
+        "indicators": ["bb", "strat"],
     },
     "estrategia_4": {
         "id": "estrategia_4",
@@ -74,6 +77,7 @@ STRATEGIES = {
         "short_name": "Estrategia 4 (Cruce Dorado)",
         "desc": "Cruce alcista EMA20 sobre EMA50 en 4h y entrada al re-testear la media EMA50 con rebote en 15m.",
         "default_tfs": {"TF_TENDENCIA": "4h", "TF_TENDENCIA_SUPERIOR": "1d", "TF_ZONA": "1h", "TF_GATILLO": "15m"},
+        "indicators": ["ema20", "ema50", "strat"],
     },
     "estrategia_5": {
         "id": "estrategia_5",
@@ -81,6 +85,7 @@ STRATEGIES = {
         "short_name": "Estrategia 5 (Divergencias)",
         "desc": "Divergencia regular (precio hace mínimo más bajo y RSI/MACD mínimo más alto) en zonas de soporte clave.",
         "default_tfs": {"TF_TENDENCIA": "1d", "TF_TENDENCIA_SUPERIOR": "1w", "TF_ZONA": "4h", "TF_GATILLO": "1h"},
+        "indicators": ["rsi", "sr", "strat"],
     },
 }
 

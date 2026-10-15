@@ -57,6 +57,21 @@
 
 <!-- ===================================================== PANEL -->
 <main id="tab-panel" class="tabpane active">
+  <!-- Letrero llamativo de estado de la operación (Rojo = Sin Operación / Verde = Operación en Curso) -->
+  <div id="opStatusBanner" class="op-status-banner idle">
+    <div class="op-banner-main">
+      <div class="op-banner-badge" id="opBannerBadge">
+        <span class="op-banner-dot"></span>
+        <span id="opBannerBadgeText">SIN OPERACIÓN ACTIVA</span>
+      </div>
+      <div class="op-banner-headline" id="opBannerHeadline">Monitoreando mercado en tiempo real · Buscando entrada según estrategia activa</div>
+    </div>
+    <div class="op-banner-metrics" id="opBannerMetrics"></div>
+    <div class="op-banner-action" id="opBannerAction" hidden>
+      <button type="button" id="btnBannerClose" class="btn danger small">Cerrar a mercado</button>
+    </div>
+  </div>
+
   <div class="grid">
     <section class="card wide strat-hero">
       <div class="cardhead">
@@ -119,13 +134,15 @@
       </div>
       <div class="ind-bar">
         <span class="muted" style="font-size: 11.5px; align-self: center; margin-right: 4px;">Indicadores y Estrategia:</span>
-        <button type="button" class="ind-pill on" data-ind="ema20"><span class="ind-dot l20"></span>EMA 20</button>
-        <button type="button" class="ind-pill on" data-ind="ema50"><span class="ind-dot l50"></span>EMA 50</button>
-        <button type="button" class="ind-pill on" data-ind="sma200"><span class="ind-dot l200"></span>SMA 200</button>
+        <button type="button" class="ind-pill" data-ind="ema20"><span class="ind-dot l20"></span>EMA 20</button>
+        <button type="button" class="ind-pill" data-ind="ema50"><span class="ind-dot l50"></span>EMA 50</button>
+        <button type="button" class="ind-pill" data-ind="sma200"><span class="ind-dot l200"></span>SMA 200</button>
         <button type="button" class="ind-pill on" data-ind="bb"><span class="ind-dot lbb"></span>Bollinger</button>
-        <button type="button" class="ind-pill on" data-ind="sr"><span class="ind-dot lsr"></span>Soportes/Res</button>
-        <button type="button" class="ind-pill on" data-ind="fib"><span class="ind-dot lfib"></span>Fibonacci</button>
+        <button type="button" class="ind-pill on" data-ind="rsi"><span class="ind-dot lrsi"></span>RSI (14)</button>
+        <button type="button" class="ind-pill" data-ind="sr"><span class="ind-dot lsr"></span>Soportes/Res</button>
+        <button type="button" class="ind-pill" data-ind="fib"><span class="ind-dot lfib"></span>Fibonacci</button>
         <button type="button" class="ind-pill on" data-ind="strat"><span class="ind-dot lstrat"></span>Estrategia (SL/TP)</button>
+        <button type="button" id="btnSyncStratInds" class="btn small" style="margin-left: auto; padding: 2px 9px; font-size: 11px;" title="Activar exclusivamente los indicadores de la estrategia activa">🎯 Auto: Indicadores de estrategia</button>
       </div>
       <div class="chartwrap" id="chartWrap">
         <canvas id="chart"></canvas>
