@@ -730,23 +730,183 @@ function renderTelegram(s) {
   if (show) { $("tgPairCmd").textContent = "/start " + tg.pairing_code; const m = Math.floor(tg.pairing_left / 60), sec = String(tg.pairing_left % 60).padStart(2, "0"); $("tgLeft").textContent = m + ":" + sec; }
 }
 
-/* ------------------------------------------------------------------ backtest */
+/* ------------------------------------------------------------------ backtest & tooltips */
 $("btHasta").value = new Date().toISOString().slice(0, 10);
 function fillSel(id, opts) { $(id).replaceChildren(...opts.map(([v, l]) => h("option", { value: v, text: l }))); }
 const CFG = ["__cfg__", "(config)"];
 fillSel("btTend", [CFG, ...TREND.map((t) => [t, t])]); fillSel("btSup", [CFG, ["", "(ninguno)"], ...TREND.map((t) => [t, t])]);
 fillSel("btZona", [CFG, ...PULL.map((t) => [t, t])]); fillSel("btGatillo", [CFG, ...TRIG.map((t) => [t, t])]);
-$("btnBtRun").onclick = async () => {
-  const r = await api("/api/backtest/start", { desde: $("btDesde").value, hasta: $("btHasta").value, tendencia: $("btTend").value, superior: $("btSup").value, zona: $("btZona").value, gatillo: $("btGatillo").value, ventana: $("btVentana").value, slippage: $("btSlip").value, martingala: $("btMart").value, margen: $("btMargen").value, riesgo_mart: $("btRiesgoM").value });
-  if (!r.ok) toast(r.error, "err"); else { $("btResult").hidden = true; shownBt = 0; poll(); }
+
+const PARAM_EXPLANATIONS = {
+  btStrat: {
+    title: "Estrategia a simular",
+    desc: "Define qué reglas matemáticas e indicadores se evalúan para generar entradas (ej. Estrategia 1: Tendencia 12h/1d + retroceso RSI < 20 y toque de Banda Bollinger inferior en 15m/30m para compra alcista)."
+  },
+  btDesde: {
+    title: "Fecha Desde",
+    desc: "Día de inicio del histórico descargado de Binance. Para un análisis estadístico robusto se recomienda probar con al menos 1 o 2 años de datos reales."
+  },
+  btHasta: {
+    title: "Fecha Hasta",
+    desc: "Fecha final de la simulación histórica. Por defecto se completa con la fecha de hoy para evaluar hasta la última vela cerrada."
+  },
+  btSlip: {
+    title: "Slippage (Deslizamiento)",
+    desc: "Diferencia estimada entre el precio al cierre de la vela gatillo y el precio real de llenado de la orden en Binance (0.0002 equivale a un 0.02% de tolerancia)."
+  },
+  btTend: {
+    title: "Tendencia (Fase 1)",
+    desc: "Temporalidad macro principal (ej. 1d o 4h) para determinar la dirección del mercado según la SMA(200) y el cruce de las EMA(20) y EMA(50)."
+  },
+  btSup: {
+    title: "Filtro superior",
+    desc: "Filtro macro mayor opcional (ej. 1w semanal o 2d). Si está activo, bloquea compras si la tendencia semanal es bajista, y viceversa."
+  },
+  btZona: {
+    title: "Retrocesos (Fase 2)",
+    desc: "Temporalidad donde se evalúa si el precio ha retrocedido hacia la zona de valor (entre EMA20 y EMA50 o niveles Fibonacci 50%-61.8%)."
+  },
+  btGatillo: {
+    title: "Gatillo (Fase 3)",
+    desc: "Temporalidad rápida (ej. 15m o 5m) donde se confirma el patrón de vela japonesa (Pin Bar, Barra Envolvente, etc.) para entrar al mercado."
+  },
+  btMart: {
+    title: "Martingala",
+    desc: "Permite promediar posición con recompras límite en soportes o niveles Fibonacci en caso de retroceso adverso. 'No' opera con entrada única fija."
+  },
+  btMargen: {
+    title: "Margen por operación (USDT)",
+    desc: "Capital en dólares bloqueado como margen aislado para la posición. Si usas martingala, es el presupuesto total repartido entre los niveles."
+  },
+  btRiesgoM: {
+    title: "Riesgo máx. martingala (USDT)",
+    desc: "Pérdida monetaria máxima permitida en dólares si todas las recompras se ejecutan y el precio toca el Stop Loss final."
+  },
+  btVentana: {
+    title: "Ventana de agotamiento",
+    desc: "Cantidad máxima de velas (1 a 5) que el bot espera para que se confirme el gatillo tras entrar a la zona de valor antes de cancelar la señal."
+  }
 };
-$("btnBtCancel").onclick = () => api("/api/backtest/cancel", {});
+
+function initParamTips() {
+  const box = $("btParamHelp"), text = $("btParamHelpText");
+  if (!box || !text) return;
+  const defHtml = "<b>Pasa el cursor por cualquier parámetro</b> para ver aquí su explicación detallada y su impacto en la estrategia.";
+  let timeout = null;
+
+  document.querySelectorAll(".has-tip").forEach((el) => {
+    const key = el.dataset.param;
+    const info = PARAM_EXPLANATIONS[key];
+    if (!info) return;
+
+    el.setAttribute("title", info.title + ": " + info.desc);
+    const inp = el.querySelector("input, select");
+    if (inp) inp.setAttribute("title", info.title + ": " + info.desc);
+
+    const onEnter = () => {
+      if (timeout) clearTimeout(timeout);
+      text.innerHTML = `<b>${info.title}:</b> ${info.desc}`;
+      box.classList.add("highlight");
+    };
+    const onLeave = () => {
+      timeout = setTimeout(() => {
+        text.innerHTML = defHtml;
+        box.classList.remove("highlight");
+      }, 3500);
+    };
+
+    el.addEventListener("mouseenter", onEnter);
+    el.addEventListener("mouseleave", onLeave);
+    if (inp) {
+      inp.addEventListener("focus", onEnter);
+      inp.addEventListener("blur", onLeave);
+    }
+  });
+}
+
+$("btnBtRun").onclick = async () => {
+  const pMsg = $("btMsg");
+  const pBar = $("btBar");
+  const progBox = $("btProg");
+  
+  // Sanitizar inputs (permitir comas en números en teclado español)
+  const slipVal = ($("btSlip").value || "0.0002").replace(",", ".").trim();
+  const margenVal = ($("btMargen").value || "").replace(",", ".").trim();
+  const riesgoMVal = ($("btRiesgoM").value || "").replace(",", ".").trim();
+  const desdeVal = ($("btDesde").value || "2022-01-01").trim();
+  const hastaVal = ($("btHasta").value || new Date().toISOString().slice(0, 10)).trim();
+  const stratVal = $("btStrat") ? $("btStrat").value : "";
+
+  // Feedback visual inmediato
+  pMsg.hidden = false;
+  pMsg.textContent = "⏳ Conectando con Binance y preparando simulación...";
+  pMsg.className = "bt-msg running";
+  progBox.hidden = false;
+  pBar.style.width = "4%";
+  $("btnBtRun").disabled = true;
+  $("btnBtCancel").hidden = false;
+
+  const r = await api("/api/backtest/start", {
+    estrategia: stratVal,
+    desde: desdeVal,
+    hasta: hastaVal,
+    tendencia: $("btTend").value,
+    superior: $("btSup").value,
+    zona: $("btZona").value,
+    gatillo: $("btGatillo").value,
+    ventana: $("btVentana").value,
+    slippage: slipVal,
+    martingala: $("btMart").value,
+    margen: margenVal,
+    riesgo_mart: riesgoMVal
+  });
+
+  if (!r.ok) {
+    pMsg.textContent = "✘ " + (r.error || "No se pudo iniciar el backtest.");
+    pMsg.className = "bt-msg error";
+    $("btnBtRun").disabled = false;
+    $("btnBtCancel").hidden = true;
+    progBox.hidden = true;
+    toast(r.error || "Error al iniciar backtest", "err");
+  } else {
+    $("btResult").hidden = true;
+    shownBt = 0;
+    toast("Simulación iniciada correctamente", "ok");
+    poll();
+  }
+};
+
+$("btnBtCancel").onclick = async () => {
+  await api("/api/backtest/cancel", {});
+  toast("Cancelación solicitada", "warn");
+};
+
 let shownBt = 0;
 function renderBacktest(s) {
-  const bt = s.backtest; $("btProg").hidden = !bt.running; $("btnBtCancel").hidden = !bt.running; $("btnBtRun").disabled = bt.running;
+  const bt = s.backtest;
+  const isRunning = !!bt.running;
+  $("btProg").hidden = !isRunning && !(bt.progress && bt.progress < 1.0);
+  $("btnBtCancel").hidden = !isRunning;
+  $("btnBtRun").disabled = isRunning;
   $("btBar").style.width = Math.round((bt.progress || 0) * 100) + "%";
-  $("btMsg").textContent = bt.error || bt.message || "";
-  if (bt.has_result && !bt.running && !shownBt) { shownBt = 1; api("/api/backtest/result").then(showBtResult); }
+  
+  const pMsg = $("btMsg");
+  if (bt.error) {
+    pMsg.textContent = "✘ " + bt.error;
+    pMsg.className = "bt-msg error";
+    pMsg.hidden = false;
+  } else if (bt.message) {
+    pMsg.textContent = (isRunning ? "⏳ " : "✔ ") + bt.message + (isRunning && bt.progress ? " (" + Math.round(bt.progress * 100) + "%)" : "");
+    pMsg.className = isRunning ? "bt-msg running" : "bt-msg success";
+    pMsg.hidden = false;
+  } else if (!isRunning) {
+    pMsg.hidden = true;
+  }
+  
+  if (bt.has_result && !bt.running && !shownBt) {
+    shownBt = 1;
+    api("/api/backtest/result").then(showBtResult);
+  }
 }
 const METRICS = [["operaciones", "Operaciones"], ["winrate_pct", "Aciertos %"], ["neto_total_usdt", "Neto USDT"], ["retorno_pct", "Retorno %"], ["capital_final", "Capital final"], ["expectativa_R", "Expectativa (R)"],
   ["profit_factor", "Profit factor"], ["max_drawdown_usdt", "Máx. drawdown USDT"], ["max_drawdown_pct", "Máx. drawdown %"], ["buy_hold_pct", "Comprar y mantener %"], ["largos", "Largos"], ["cortos", "Cortos"], ["con_martingala", "Con niveles ejecutados"], ["niveles_medios", "Niveles medios"]];
@@ -776,6 +936,7 @@ function drawEquity(cv, pts) {
 }
 
 /* ------------------------------------------------------------------ arranque */
-loadConfig(); poll(); refreshChart();
+loadConfig(); poll(); refreshChart(); initParamTips();
 setInterval(poll, 2000); setInterval(refreshChart, 3000);
+
 

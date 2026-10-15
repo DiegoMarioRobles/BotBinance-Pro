@@ -148,3 +148,96 @@ dialog::backdrop { background: rgba(0,0,0,.55); }
 .exec-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
 .exec-msg { padding: 8px 12px; border-radius: 6px; background: var(--panel2); border-left: 3px solid var(--info); font-size: 12.5px; color: var(--text); }
 .exec-msg.reached { border-left-color: var(--up); background: rgba(38,166,154,0.12); color: var(--up); font-weight: 600; }
+
+/* Layout horizontal para Backtest y API */
+.bt-layout { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+.bt-top-row { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1060px) {
+  .bt-top-row { grid-template-columns: 1fr; }
+}
+
+.bt-params-card { min-width: 0; }
+.bt-api-card { min-width: 0; background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%); }
+.bt-formgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 8px 12px; }
+.bt-field-wide { grid-column: 1 / -1; }
+.field.has-tip { position: relative; margin-bottom: 8px; }
+.field.has-tip label { display: flex; align-items: center; justify-content: space-between; }
+
+/* Indicador de ayuda ⓘ en cada parámetro */
+.tip-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  color: var(--accent);
+  margin-left: 4px;
+  cursor: help;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.field.has-tip:hover .tip-ico, .tip-ico:hover {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+/* Caja de explicación dinámica del parámetro */
+.param-help-box {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: all 0.2s ease;
+  min-height: 48px;
+}
+.param-help-box.highlight {
+  border-color: var(--accent);
+  background: rgba(240, 185, 11, 0.06);
+  box-shadow: 0 0 14px rgba(240, 185, 11, 0.14);
+}
+.help-ico { font-size: 17px; line-height: 1; flex-shrink: 0; }
+#btParamHelpText b { color: var(--accent); }
+
+/* Mensajes de progreso del backtest */
+.bt-msg {
+  margin-top: 10px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
+}
+.bt-msg.running {
+  background: rgba(41, 182, 246, 0.1);
+  border: 1px solid var(--info);
+  color: var(--info);
+}
+.bt-msg.error {
+  background: rgba(239, 83, 80, 0.12);
+  border: 1px solid var(--down);
+  color: var(--down);
+  font-weight: 600;
+}
+.bt-msg.success {
+  background: rgba(38, 166, 154, 0.12);
+  border: 1px solid var(--up);
+  color: var(--up);
+  font-weight: 600;
+}

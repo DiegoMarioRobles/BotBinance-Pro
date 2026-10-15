@@ -34,12 +34,19 @@ log = logging.getLogger("botbinance.backtest")
 # Descarga de historial (con caché en disco)
 # ---------------------------------------------------------------------------
 def _download(client: BinanceFutures, symbol: str, tf: str, start_ms: int, end_ms: int,
-              cancel: threading.Event | None = None) -> pd.DataFrame:
+              cancel: threading.Event | None = None,
+              progress: Callable[[float, str], None] | None = None,
+              prog_base: float = 0.0, prog_weight: float = 0.18) -> pd.DataFrame:
     parts: list[pd.DataFrame] = []
     cur = start_ms
+    total_span = max(end_ms - start_ms, 1)
     while cur < end_ms:
         if cancel is not None and cancel.is_set():
             raise InterruptedError("cancelado")
+        if progress is not None:
+            frac = min(max((cur - start_ms) / total_span, 0.0), 1.0)
+            dt_str = time.strftime("%Y-%m", time.gmtime(cur / 1000))
+            progress(prog_base + prog_weight * frac, f"Descargando {tf} de Binance ({dt_str})…")
         kl = client.klines(symbol, tf, limit=1500, start_time=cur)
         if not kl:
             break
@@ -51,7 +58,7 @@ def _download(client: BinanceFutures, symbol: str, tf: str, start_ms: int, end_m
         cur = nxt
         if len(df) < 1500:
             break
-        time.sleep(0.05)
+        time.sleep(0.04)
     if not parts:
         return pd.DataFrame(columns=COLS)
     out = pd.concat(parts, ignore_index=True).drop_duplicates("open_time")
@@ -59,10 +66,12 @@ def _download(client: BinanceFutures, symbol: str, tf: str, start_ms: int, end_m
 
 
 def load_history(client: BinanceFutures, symbol: str, tf: str, start_ms: int, end_ms: int,
-                 cancel: threading.Event | None = None) -> pd.DataFrame:
+                 cancel: threading.Event | None = None,
+                 progress: Callable[[float, str], None] | None = None,
+                 prog_base: float = 0.0, prog_weight: float = 0.18) -> pd.DataFrame:
     """Velas cerradas de [start_ms, end_ms]; usa/actualiza la caché data/hist/<par>_<tf>.csv."""
     if tf in RESAMPLED:                       # 16h, 20h, 2d: se construyen a partir de velas reales de otra temporalidad
-        return resample(load_history(client, symbol, RESAMPLED[tf][0], start_ms, end_ms, cancel), tf)
+        return resample(load_history(client, symbol, RESAMPLED[tf][0], start_ms, end_ms, cancel, progress, prog_base, prog_weight), tf)
     iv = TF_MS[tf]
     csv = paths.HIST_DIR / f"{symbol}_{tf}.csv"
     meta_f = paths.HIST_DIR / f"{symbol}_{tf}.meta.json"
@@ -75,12 +84,12 @@ def load_history(client: BinanceFutures, symbol: str, tf: str, start_ms: int, en
         except (OSError, ValueError):
             df = None
     if df is None or df.empty:
-        df = _download(client, symbol, tf, start_ms, end_ms, cancel)
+        df = _download(client, symbol, tf, start_ms, end_ms, cancel, progress, prog_base, prog_weight)
         meta_f.write_text(json.dumps({"requested_start": start_ms}), encoding="utf-8")
     else:
         last = int(df["open_time"].iloc[-1])
         if last + 2 * iv < min(end_ms, client.now_ms()):
-            new = _download(client, symbol, tf, last + iv, end_ms, cancel)
+            new = _download(client, symbol, tf, last + iv, end_ms, cancel, progress, prog_base, prog_weight)
             if not new.empty:
                 df = pd.concat([df, new], ignore_index=True).drop_duplicates("open_time")
     df = df.sort_values("open_time").reset_index(drop=True)
@@ -198,9 +207,12 @@ def run_backtest(cfg, client: BinanceFutures, start_ms: int, end_ms: int, slippa
                          "Acorta el rango de fechas o usa un gatillo mayor.")
     frames: dict[str, pd.DataFrame] = {}
     for n, tf in enumerate(tfs):
-        say(0.02 + 0.18 * n / len(tfs), f"Descargando historial {tf}…")
+        base = 0.02 + 0.18 * n / len(tfs)
+        weight = 0.18 / len(tfs)
+        say(base, f"Descargando historial {tf}…")
         warm = 320 * TF_MS[tf]                     # 320 velas de calentamiento para los indicadores
-        df = load_history(client, cfg.SYMBOL, tf, max(start_ms - warm, 0), end_ms, cancel)
+        df = load_history(client, cfg.SYMBOL, tf, max(start_ms - warm, 0), end_ms, cancel,
+                          progress=say, prog_base=base, prog_weight=weight)
         if df.empty:
             raise RuntimeError(f"Sin datos históricos para {tf}")
         frames[tf] = enrich(df, cfg.BB_PERIODO, cfg.BB_DESVIACION)

@@ -50,8 +50,8 @@
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="panel">Panel</button>
   <button class="tab" data-tab="historial">📜 Historial</button>
+  <button class="tab" data-tab="backtest">🔬 Backtest & API</button>
   <button class="tab" data-tab="config">⚙ Configuración</button>
-  <button class="tab" data-tab="backtest">Backtest</button>
   <button class="tab" data-tab="logs">Registro</button>
 </nav>
 
@@ -207,60 +207,16 @@
 <!-- ===================================================== CONFIGURACIÓN -->
 <main id="tab-config" class="tabpane">
   <div class="grid cfg">
-    <section class="card">
-      <div class="cardhead"><h2>Conexión con Binance</h2></div>
-      <div class="field">
-        <label>Modo de operación</label>
-        <div class="seg" id="modeSeg">
-          <button data-mode="testnet" class="on">Testnet (pruebas)</button>
-          <button data-mode="real">Cuenta REAL</button>
+    <section class="card wide" style="border-left: 4px solid var(--accent); background: var(--panel2); margin-bottom: 12px;">
+      <div class="row" style="margin: 0; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <strong style="color: var(--accent); font-size: 13.5px;">🔑 Claves API de Binance</strong>
+          <p class="muted" style="margin: 4px 0 0 0; font-size: 12.5px;">
+            La configuración y prueba de tus claves de Binance (Testnet y Cuenta Real) ahora se gestiona directamente en la pestaña <strong>Backtest & API</strong> junto a la simulación.
+          </p>
         </div>
-        <small class="muted">Al cambiar de modo el bot queda en pausa hasta que lo reanudes.</small>
+        <button type="button" class="btn primary small" onclick="document.querySelector('button[data-tab=backtest]').click()">Ir a Backtest & API ➔</button>
       </div>
-      <div class="field">
-        <label for="testUrl">Servidor de pruebas</label>
-        <select id="testUrl">
-          <option value="https://testnet.binancefuture.com">testnet.binancefuture.com</option>
-          <option value="https://demo-fapi.binance.com">demo-fapi.binance.com (Futures Demo)</option>
-        </select>
-      </div>
-
-      <div class="field" style="margin-top: 10px;">
-        <label>Credenciales a visualizar / editar:</label>
-        <div class="seg" id="credsSeg">
-          <button type="button" data-creds="testnet" class="on" id="btnTabTestnet">Claves TESTNET</button>
-          <button type="button" data-creds="real" id="btnTabReal">Claves Cuenta REAL</button>
-        </div>
-      </div>
-
-      <fieldset id="fsTestnet">
-        <legend>Claves de TESTNET</legend>
-        <div class="field"><label for="testnet_api_key">API Key</label>
-          <input id="testnet_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la API Key"><small id="st_testnet_api_key" class="muted"></small></div>
-        <div class="field"><label for="testnet_api_secret">API Secret</label>
-          <input id="testnet_api_secret" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la Secret"><small id="st_testnet_api_secret" class="muted"></small></div>
-        <button class="btn" id="btnTestTestnet">Probar conexión Testnet</button>
-        <button class="btn small danger" id="btnClearTestnet">Borrar claves guardadas</button>
-        <div id="resTestnet" class="result"></div>
-      </fieldset>
-
-      <fieldset id="fsReal" hidden>
-        <legend>Claves de la cuenta REAL</legend>
-        <div class="field"><label for="real_api_key">API Key</label>
-          <input id="real_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la API Key"><small id="st_real_api_key" class="muted"></small></div>
-        <div class="field"><label for="real_api_secret">API Secret</label>
-          <input id="real_api_secret" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la Secret"><small id="st_real_api_secret" class="muted"></small></div>
-        <button class="btn" id="btnTestReal">Probar conexión Real</button>
-        <button class="btn small danger" id="btnClearReal">Borrar claves guardadas</button>
-        <div id="resReal" class="result"></div>
-      </fieldset>
-
-      <div class="field">
-        <label>IP pública de este PC <small class="muted">(la que debes añadir a la whitelist de la API key)</small></label>
-        <div class="row"><code id="ipBox">–</code><button class="btn small" id="btnCopyIp">Copiar</button><button class="btn small" id="btnRefreshIp">Actualizar</button></div>
-      </div>
-      <div class="row"><button class="btn primary" id="btnSaveCreds">Guardar claves</button><small class="muted" id="credsMsg"></small></div>
-      <small class="muted" id="backendNote"></small>
     </section>
 
     <section class="card">
@@ -312,44 +268,174 @@
   </div>
 </main>
 
-<!-- ===================================================== BACKTEST -->
+<!-- ===================================================== BACKTEST & API -->
 <main id="tab-backtest" class="tabpane">
-  <div class="grid">
+  <div class="bt-layout">
     <section class="card wide" style="border-left: 4px solid var(--accent); background: var(--panel2);">
-      <div class="row" style="margin: 0; justify-content: space-between; align-items: center;">
+      <div class="row" style="margin: 0; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
         <div>
-          <strong style="color: var(--accent); font-size: 13.5px;">Simulación Histórica (Datos pasados 2022–2026)</strong>
+          <strong style="color: var(--accent); font-size: 13.5px;">Simulación Histórica y Conexión API Binance</strong>
           <p class="muted" style="margin: 4px 0 0 0; font-size: 12.5px;">
-            Este módulo procesa velas pasadas descargadas de Binance para comprobar la efectividad matemática de las reglas. 
-            <strong>Las operaciones que verás abajo NO son operaciones en vivo ni usan tu saldo actual.</strong> Para ver tus operaciones en vivo ve a la pestaña <strong>Panel</strong>.
+            Prueba la efectividad matemática de las estrategias con datos históricos reales y gestiona tus claves de Binance directamente en el mismo sector.
           </p>
         </div>
       </div>
     </section>
 
-    <section class="card">
-      <div class="cardhead"><h2>Parámetros del Backtest</h2></div>
-      <p class="muted">Prueba la estrategia con datos históricos reales de Binance, con la misma lógica y gestión de riesgo del bot en vivo.</p>
-      <div class="formgrid">
-        <div class="field"><label for="btStrat">Estrategia a simular</label><select id="btStrat"></select></div>
-        <div class="field"><label for="btDesde">Desde</label><input id="btDesde" type="date" value="2022-01-01"></div>
-        <div class="field"><label for="btHasta">Hasta</label><input id="btHasta" type="date"></div>
-        <div class="field"><label for="btTend">Tendencia</label><select id="btTend"></select></div>
-        <div class="field"><label for="btSup">Filtro superior</label><select id="btSup"></select></div>
-        <div class="field"><label for="btZona">Retrocesos (zona)</label><select id="btZona"></select></div>
-        <div class="field"><label for="btGatillo">Gatillo</label><select id="btGatillo"></select></div>
-        <div class="field"><label for="btMart">Martingala</label><select id="btMart"><option value="__cfg__">(config)</option><option value="si">Sí</option><option value="no">No</option></select></div>
-        <div class="field"><label for="btMargen">Margen por operación (USDT)</label><input id="btMargen" type="number" step="1" placeholder="(config)"></div>
-        <div class="field"><label for="btRiesgoM">Riesgo máx. martingala (USDT)</label><input id="btRiesgoM" type="number" step="0.5" placeholder="(config)"></div>
-        <div class="field"><label for="btVentana">Ventana de agotamiento</label><input id="btVentana" type="number" min="1" max="5" placeholder="(config)"></div>
-        <div class="field"><label for="btSlip">Slippage</label><input id="btSlip" type="number" step="0.0001" value="0.0002"></div>
-      </div>
-      <div class="row"><button class="btn primary" id="btnBtRun">Ejecutar backtest</button><button class="btn small" id="btnBtCancel" hidden>Cancelar</button></div>
-      <div class="progress" id="btProg" hidden><div id="btBar"></div></div>
-      <small class="muted" id="btMsg"></small>
-    </section>
+    <div class="bt-top-row">
+      <!-- COLUMNA 1: PARÁMETROS DEL BACKTEST (FORMATO HORIZONTAL) -->
+      <section class="card bt-params-card">
+        <div class="cardhead">
+          <div>
+            <h2>🔬 Parámetros del Backtest</h2>
+            <p class="muted" style="margin: 2px 0 0; font-size: 12px;">Simulación vela a vela con datos históricos reales de Binance</p>
+          </div>
+        </div>
+
+        <div class="bt-formgrid">
+          <!-- Estrategia (ocupa todo el ancho) -->
+          <div class="field bt-field-wide has-tip" data-param="btStrat">
+            <label for="btStrat"><span>Estrategia a simular</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <select id="btStrat"></select>
+          </div>
+
+          <!-- Fechas y Slippage -->
+          <div class="field has-tip" data-param="btDesde">
+            <label for="btDesde"><span>Desde</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <input id="btDesde" type="date" value="2022-01-01">
+          </div>
+          <div class="field has-tip" data-param="btHasta">
+            <label for="btHasta"><span>Hasta</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <input id="btHasta" type="date">
+          </div>
+          <div class="field has-tip" data-param="btSlip">
+            <label for="btSlip"><span>Slippage</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <input id="btSlip" type="text" value="0.0002" placeholder="0.0002">
+          </div>
+
+          <!-- Temporalidades -->
+          <div class="field has-tip" data-param="btTend">
+            <label for="btTend"><span>Tendencia (Fase 1)</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <select id="btTend"></select>
+          </div>
+          <div class="field has-tip" data-param="btSup">
+            <label for="btSup"><span>Filtro superior</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <select id="btSup"></select>
+          </div>
+          <div class="field has-tip" data-param="btZona">
+            <label for="btZona"><span>Retrocesos (Fase 2)</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <select id="btZona"></select>
+          </div>
+          <div class="field has-tip" data-param="btGatillo">
+            <label for="btGatillo"><span>Gatillo (Fase 3)</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <select id="btGatillo"></select>
+          </div>
+
+          <!-- Gestión y Margen -->
+          <div class="field has-tip" data-param="btMart">
+            <label for="btMart"><span>Martingala</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <select id="btMart">
+              <option value="__cfg__">(config)</option>
+              <option value="si">Sí</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="field has-tip" data-param="btMargen">
+            <label for="btMargen"><span>Margen (USDT)</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <input id="btMargen" type="text" placeholder="(config ej. 20)">
+          </div>
+          <div class="field has-tip" data-param="btRiesgoM">
+            <label for="btRiesgoM"><span>Riesgo máx. (USDT)</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <input id="btRiesgoM" type="text" placeholder="(config ej. 3)">
+          </div>
+          <div class="field has-tip" data-param="btVentana">
+            <label for="btVentana"><span>Ventana agotamiento</span><span class="tip-ico" title="Pasa el cursor para ver la explicación">ⓘ</span></label>
+            <input id="btVentana" type="number" min="1" max="5" placeholder="(config ej. 3)">
+          </div>
+        </div>
+
+        <!-- EXPLICACIÓN INTERACTIVA AL POSICIONARSE EN CUALQUIER PARÁMETRO -->
+        <div class="param-help-box" id="btParamHelp">
+          <span class="help-ico">💡</span>
+          <span id="btParamHelpText"><b>Pasa el cursor por cualquier parámetro</b> para ver aquí su explicación detallada y su impacto en la estrategia.</span>
+        </div>
+
+        <!-- ACCIONES Y PROGRESO -->
+        <div class="row" style="margin-top: 14px; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <button class="btn primary" id="btnBtRun">▶ Ejecutar backtest</button>
+          <button class="btn small danger" id="btnBtCancel" hidden>⏹ Cancelar</button>
+        </div>
+        <div class="progress" id="btProg" hidden><div id="btBar"></div></div>
+        <div id="btMsg" class="bt-msg" hidden></div>
+      </section>
+
+      <!-- COLUMNA 2: CONEXIÓN API BINANCE (EN EL ESPACIO LATERAL) -->
+      <section class="card bt-api-card">
+        <div class="cardhead"><h2>🔑 Conexión API Binance</h2></div>
+        
+        <div class="field">
+          <label>Modo de operación</label>
+          <div class="seg" id="modeSeg">
+            <button data-mode="testnet" class="on">Testnet (pruebas)</button>
+            <button data-mode="real">Cuenta REAL</button>
+          </div>
+          <small class="muted">Al cambiar de modo el bot queda en pausa por seguridad.</small>
+        </div>
+
+        <div class="field">
+          <label for="testUrl">Servidor de pruebas</label>
+          <select id="testUrl">
+            <option value="https://testnet.binancefuture.com">testnet.binancefuture.com</option>
+            <option value="https://demo-fapi.binance.com">demo-fapi.binance.com (Futures Demo)</option>
+          </select>
+        </div>
+
+        <div class="field" style="margin-top: 8px;">
+          <label>Credenciales a editar:</label>
+          <div class="seg" id="credsSeg">
+            <button type="button" data-creds="testnet" class="on" id="btnTabTestnet">Claves TESTNET</button>
+            <button type="button" data-creds="real" id="btnTabReal">Claves REAL</button>
+          </div>
+        </div>
+
+        <fieldset id="fsTestnet">
+          <legend>Claves de TESTNET</legend>
+          <div class="field"><label for="testnet_api_key">API Key</label>
+            <input id="testnet_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la API Key"><small id="st_testnet_api_key" class="muted"></small></div>
+          <div class="field"><label for="testnet_api_secret">API Secret</label>
+            <input id="testnet_api_secret" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la Secret"><small id="st_testnet_api_secret" class="muted"></small></div>
+          <div class="row" style="margin-top: 8px;">
+            <button class="btn ok small" id="btnTestTestnet">⚡ Probar conexión</button>
+            <button class="btn small danger" id="btnClearTestnet">Borrar claves</button>
+          </div>
+          <div id="resTestnet" class="result"></div>
+        </fieldset>
+
+        <fieldset id="fsReal" hidden>
+          <legend>Claves de la cuenta REAL</legend>
+          <div class="field"><label for="real_api_key">API Key</label>
+            <input id="real_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la API Key"><small id="st_real_api_key" class="muted"></small></div>
+          <div class="field"><label for="real_api_secret">API Secret</label>
+            <input id="real_api_secret" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la Secret"><small id="st_real_api_secret" class="muted"></small></div>
+          <div class="row" style="margin-top: 8px;">
+            <button class="btn ok small" id="btnTestReal">⚡ Probar conexión</button>
+            <button class="btn small danger" id="btnClearReal">Borrar claves</button>
+          </div>
+          <div id="resReal" class="result"></div>
+        </fieldset>
+
+        <div class="field">
+          <label>IP pública de este PC <small class="muted">(whitelist Binance)</small></label>
+          <div class="row"><code id="ipBox">–</code><button class="btn small" id="btnCopyIp">Copiar</button><button class="btn small" id="btnRefreshIp">↺</button></div>
+        </div>
+        <div class="row"><button class="btn primary" id="btnSaveCreds">💾 Guardar claves</button><small class="muted" id="credsMsg"></small></div>
+        <small class="muted" id="backendNote" style="font-size: 11px; margin-top: 6px; display: block;"></small>
+      </section>
+    </div>
+
+    <!-- RESULTADOS DEL BACKTEST -->
     <section class="card wide" id="btResult" hidden>
-      <div class="cardhead"><h2>Resultado</h2></div>
+      <div class="cardhead"><h2>Resultado del Backtest</h2></div>
       <div id="btNotes" class="notes"></div>
       <div id="btMetrics" class="metrics"></div>
       <canvas id="btEquity" class="equity"></canvas>

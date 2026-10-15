@@ -550,15 +550,18 @@ class Engine:
             return "Ya hay un backtest en ejecución."
         try:
             today = time.strftime("%Y-%m-%d", time.gmtime())
-            desde = parse_date(str(p.get("desde") or "2022-01-01"))
-            hasta = min(parse_date(str(p.get("hasta") or today)) + 86_400_000 - 1, now_ms())
+            raw_desde = str(p.get("desde") or "2022-01-01").strip()
+            raw_hasta = str(p.get("hasta") or today).strip()
+            desde = parse_date(raw_desde)
+            hasta = min(parse_date(raw_hasta) + 86_400_000 - 1, now_ms())
         except ValueError:
-            return "Fechas inválidas (usa AAAA-MM-DD)."
+            return "Fechas inválidas (usa formato AAAA-MM-DD)."
         if desde >= hasta:
             return "La fecha inicial debe ser anterior a la final."
         c = copy.copy(self.cfg)
-        mart = {"si": True, "no": False}.get(str(p.get("martingala", "")).lower())
+        mart = {"si": True, "no": False}.get(str(p.get("martingala", "")).strip().lower())
         over = {
+            "ESTRATEGIA": p.get("estrategia"),
             "TF_TENDENCIA": p.get("tendencia"), "TF_TENDENCIA_SUPERIOR": p.get("superior"),
             "TF_ZONA": p.get("zona"), "TF_GATILLO": p.get("gatillo"), "VENTANA_AGOTAMIENTO": p.get("ventana"),
             "MARTINGALA_ACTIVA": mart, "MARTINGALA_NIVELES": p.get("niveles"),
@@ -572,11 +575,12 @@ class Engine:
         if errs:
             return "; ".join(errs)
         try:
-            slip = min(max(float(p.get("slippage", 0.0002)), 0.0), 0.01)
+            raw_slip = str(p.get("slippage", "0.0002") or "0.0002").strip().replace(",", ".")
+            slip = min(max(float(raw_slip), 0.0), 0.01)
         except (TypeError, ValueError):
-            return "Slippage inválido."
+            return "Slippage inválido (usa valores como 0.0002)."
         self._bt_cancel = threading.Event()
-        bt.update(running=True, progress=0.0, message="Iniciando…", result=None, error="")
+        bt.update(running=True, progress=0.01, message="Conectando con Binance para descargar historial…", result=None, error="")
 
         def progress(frac: float, msg: str) -> None:
             bt.update(progress=round(frac, 3), message=msg)
