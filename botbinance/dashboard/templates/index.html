@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="token" content="{{ token }}">
+<title>Bot BTC · Top-Down Pullback</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">₿</span>
+    <div><h1>Bot BTC/USDT</h1><small>Top-Down Pullback · v{{ version }}</small></div>
+  </div>
+  <div class="chips">
+    <span id="chipMode" class="chip">–</span>
+    <span id="chipStatus" class="chip">–</span>
+    <span id="chipFeed" class="chip" title="WebSocket de velas">Datos</span>
+    <span id="chipApi" class="chip" title="Conexión con la API de Binance">API</span>
+    <span id="chipTg" class="chip" title="Telegram">Telegram</span>
+  </div>
+  <div class="price"><span id="price">–</span><small id="priceAge"></small></div>
+  <div class="actions">
+    <button id="btnPause" class="btn warn">Pausar</button>
+    <button id="btnResume" class="btn ok">Reanudar</button>
+  </div>
+</header>
+
+<div id="alerts"></div>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="panel">Panel</button>
+  <button class="tab" data-tab="config">⚙ Configuración</button>
+  <button class="tab" data-tab="backtest">Backtest</button>
+  <button class="tab" data-tab="logs">Registro</button>
+</nav>
+
+<!-- ===================================================== PANEL -->
+<main id="tab-panel" class="tabpane active">
+  <div class="grid">
+    <section class="card wide strat-hero">
+      <div class="cardhead">
+        <div class="row" style="align-items: center; gap: 10px;">
+          <span class="chip ok" id="stratBadge">Estrategia 1</span>
+          <h2 id="stratTitle">Estrategia 1 · Rebote en Sobreventa (RSI &lt; 20 + Bollinger)</h2>
+        </div>
+        <div class="row" style="align-items: center; gap: 8px;">
+          <label for="selStrategyTop" class="muted">Estrategia activa:</label>
+          <select id="selStrategyTop" class="btn small" title="Cambiar estrategia activa"></select>
+        </div>
+      </div>
+      <p id="stratDesc" class="note"></p>
+      <div class="exec-card" id="execPointsCard">
+        <div class="exec-grid">
+          <div class="exec-item">
+            <span class="exec-lbl">Precio actual BTC</span>
+            <b id="epPrice" class="exec-val">–</b>
+          </div>
+          <div class="exec-item">
+            <span class="exec-lbl">Punto de ejecución (Precio)</span>
+            <b id="epTargetPrice" class="exec-val">–</b>
+          </div>
+          <div class="exec-item">
+            <span class="exec-lbl">RSI actual</span>
+            <b id="epRsi" class="exec-val">–</b>
+          </div>
+          <div class="exec-item">
+            <span class="exec-lbl">Objetivo RSI</span>
+            <b id="epTargetRsi" class="exec-val">–</b>
+          </div>
+        </div>
+        <div id="epStatusMsg" class="exec-msg">Calculando puntos de ejecución…</div>
+      </div>
+    </section>
+
+    <section class="card chartcard">
+      <div class="cardhead">
+        <h2>Gráfico</h2>
+        <select id="tfSelect" aria-label="Temporalidad del gráfico" title="Temporalidad del gráfico"></select>
+        <div class="seg"><button id="zoomOut" title="Alejar" aria-label="Alejar">−</button><button id="zoomIn" title="Acercar" aria-label="Acercar">+</button></div>
+        <div class="legend">
+          <span class="lg l20">EMA20</span><span class="lg l50">EMA50</span><span class="lg l200">SMA200</span><span class="lg lbb">Bollinger</span>
+        </div>
+      </div>
+      <div class="chartwrap"><canvas id="chart"></canvas><div id="tip" class="tip" hidden></div></div>
+      <small class="muted" id="tfRoles"></small><br>
+      <small class="muted">Ctrl + rueda (o botones +/−) = zoom · arrastrar = mover · doble clic = restablecer · líneas punteadas: S = soporte, R = resistencia</small>
+    </section>
+
+    <section class="card">
+      <div class="cardhead"><h2>Análisis de la estrategia</h2><span id="trendBadge" class="chip">–</span></div>
+      <p id="evNote" class="note"></p>
+      <h3 id="ph1Title">Fase 1 · Tendencia</h3>
+      <table class="checks" id="ph1"><thead><tr><th>Condición</th><th>Valor</th><th title="Largo">L</th><th title="Corto">S</th></tr></thead><tbody></tbody></table>
+      <h3 id="ph2Title">Fase 2 · Retroceso a zona de valor <span id="ph2Badge" class="mini"></span></h3>
+      <table class="checks" id="ph2"><tbody></tbody></table>
+      <h3 id="ph3Title">Fase 3 · Gatillo <span id="ph3Badge" class="mini"></span></h3>
+      <table class="checks" id="ph3"><tbody></tbody></table>
+    </section>
+
+    <section class="card">
+      <div class="cardhead"><h2>Posición</h2><button id="btnClose" class="btn danger small" hidden>Cerrar a mercado</button></div>
+      <div id="posBox" class="muted">Sin operación abierta.</div>
+      <h3>Cuenta</h3>
+      <div id="balBox" class="kv"></div>
+      <h3>Historial de operaciones EN VIVO (Testnet / Real)</h3>
+      <small class="muted" style="display:block;margin-bottom:6px;">Solo operaciones reales ejecutadas por el bot en vivo</small>
+      <div class="tablewrap"><table class="grid-table" id="histTable"><thead><tr><th>Cierre</th><th>Lado</th><th>Entrada $</th><th>Salida $</th><th>Neto USDT</th><th>Motivo</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section class="card wide">
+      <div class="cardhead"><h2>Tablero de diagnóstico financiero</h2></div>
+      <pre id="board" class="board">Cargando…</pre>
+    </section>
+  </div>
+</main>
+
+<!-- ===================================================== CONFIGURACIÓN -->
+<main id="tab-config" class="tabpane">
+  <div class="grid cfg">
+    <section class="card">
+      <div class="cardhead"><h2>Conexión con Binance</h2></div>
+      <div class="field">
+        <label>Modo de operación</label>
+        <div class="seg" id="modeSeg">
+          <button data-mode="testnet" class="on">Testnet (pruebas)</button>
+          <button data-mode="real">Cuenta REAL</button>
+        </div>
+        <small class="muted">Al cambiar de modo el bot queda en pausa hasta que lo reanudes.</small>
+      </div>
+      <div class="field">
+        <label for="testUrl">Servidor de pruebas</label>
+        <select id="testUrl">
+          <option value="https://testnet.binancefuture.com">testnet.binancefuture.com</option>
+          <option value="https://demo-fapi.binance.com">demo-fapi.binance.com (Futures Demo)</option>
+        </select>
+      </div>
+
+      <div class="field" style="margin-top: 10px;">
+        <label>Credenciales a visualizar / editar:</label>
+        <div class="seg" id="credsSeg">
+          <button type="button" data-creds="testnet" class="on" id="btnTabTestnet">Claves TESTNET</button>
+          <button type="button" data-creds="real" id="btnTabReal">Claves Cuenta REAL</button>
+        </div>
+      </div>
+
+      <fieldset id="fsTestnet">
+        <legend>Claves de TESTNET</legend>
+        <div class="field"><label for="testnet_api_key">API Key</label>
+          <input id="testnet_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la API Key"><small id="st_testnet_api_key" class="muted"></small></div>
+        <div class="field"><label for="testnet_api_secret">API Secret</label>
+          <input id="testnet_api_secret" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la Secret"><small id="st_testnet_api_secret" class="muted"></small></div>
+        <button class="btn" id="btnTestTestnet">Probar conexión Testnet</button>
+        <button class="btn small danger" id="btnClearTestnet">Borrar claves guardadas</button>
+        <div id="resTestnet" class="result"></div>
+      </fieldset>
+
+      <fieldset id="fsReal" hidden>
+        <legend>Claves de la cuenta REAL</legend>
+        <div class="field"><label for="real_api_key">API Key</label>
+          <input id="real_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la API Key"><small id="st_real_api_key" class="muted"></small></div>
+        <div class="field"><label for="real_api_secret">API Secret</label>
+          <input id="real_api_secret" type="password" autocomplete="new-password" spellcheck="false" placeholder="Pega aquí la Secret"><small id="st_real_api_secret" class="muted"></small></div>
+        <button class="btn" id="btnTestReal">Probar conexión Real</button>
+        <button class="btn small danger" id="btnClearReal">Borrar claves guardadas</button>
+        <div id="resReal" class="result"></div>
+      </fieldset>
+
+      <div class="field">
+        <label>IP pública de este PC <small class="muted">(la que debes añadir a la whitelist de la API key)</small></label>
+        <div class="row"><code id="ipBox">–</code><button class="btn small" id="btnCopyIp">Copiar</button><button class="btn small" id="btnRefreshIp">Actualizar</button></div>
+      </div>
+      <div class="row"><button class="btn primary" id="btnSaveCreds">Guardar claves</button><small class="muted" id="credsMsg"></small></div>
+      <small class="muted" id="backendNote"></small>
+    </section>
+
+    <section class="card">
+      <div class="cardhead"><h2>Telegram</h2><span id="tgState" class="chip">–</span></div>
+      <div class="field"><label for="telegram_token">Token del bot (@BotFather)</label>
+        <input id="telegram_token" type="password" autocomplete="new-password" spellcheck="false" placeholder="123456789:AA…"><small id="st_telegram_token" class="muted"></small></div>
+      <div class="row">
+        <button class="btn" id="btnTgPair">Generar código de vinculación</button>
+        <button class="btn small" id="btnTgTest">Mensaje de prueba</button>
+        <button class="btn small danger" id="btnTgUnlink">Desvincular</button>
+      </div>
+      <div id="tgPair" class="pairbox" hidden>
+        <div>Envía este mensaje a tu bot en Telegram:</div>
+        <code id="tgPairCmd">/start 000000</code>
+        <small class="muted">Válido <span id="tgLeft">10:00</span> min.</small>
+      </div>
+      <label class="check"><input type="checkbox" id="TELEGRAM_ACTIVO"> Enviar avisos por Telegram</label>
+      <label class="check"><input type="checkbox" id="TELEGRAM_AVISAR_SENALES_BLOQUEADAS"> Avisar también de señales bloqueadas por el riesgo</label>
+      <small class="muted">Guarda el token con «Guardar claves». Después genera el código y envíalo a tu bot.</small>
+    </section>
+
+    <section class="card">
+      <div class="cardhead"><h2>Temporalidades</h2></div>
+      <p class="note">Cada función usa su propia temporalidad: la <b>tendencia</b> dice si el mercado es alcista o bajista;
+        los <b>retrocesos</b> (y el Fibonacci / soportes) se miden en una temporalidad menor; el <b>gatillo</b> es donde se
+        confirma la entrada. Orden obligatorio: gatillo ≤ retrocesos ≤ tendencia ≤ filtro superior. 16h, 20h y 2d no existen en
+        Binance: el bot las construye agrupando velas reales de 4h / 1d.</p>
+      <div class="formgrid" id="formTfs"></div>
+      <div class="row"><button class="btn primary" id="btnSaveTfs">Guardar temporalidades</button></div>
+    </section>
+
+    <section class="card">
+      <div class="cardhead"><h2>Martingala (entradas escalonadas)</h2></div>
+      <p class="note">⚠ La martingala <b>aumenta la exposición justo cuando el mercado va en tu contra</b>. La 1ª entrada es a mercado y
+        las siguientes son órdenes límite en soportes/resistencias, cada una el múltiplo de la anterior, con un único Stop Loss
+        detrás del último nivel. El «margen por operación» es el presupuesto <b>total</b> de todos los niveles y la pérdida total
+        (todos los niveles + SL) nunca supera el riesgo máximo: por eso la 1ª entrada es más pequeña. Si no cabe, el bot usa menos
+        niveles o una sola entrada y lo avisa.</p>
+      <div class="formgrid" id="formMart"></div>
+      <div class="row"><button class="btn primary" id="btnSaveMart">Guardar martingala</button></div>
+    </section>
+
+    <section class="card wide">
+      <div class="cardhead"><h2>Capital y riesgo</h2></div>
+      <div class="formgrid" id="formRisk"></div>
+      <details><summary>Parámetros avanzados de la estrategia</summary><div class="formgrid" id="formAdv"></div></details>
+      <div class="row"><button class="btn primary" id="btnSaveCfg">Guardar parámetros</button><small class="muted" id="cfgMsg"></small></div>
+    </section>
+  </div>
+</main>
+
+<!-- ===================================================== BACKTEST -->
+<main id="tab-backtest" class="tabpane">
+  <div class="grid">
+    <section class="card wide" style="border-left: 4px solid var(--accent); background: var(--panel2);">
+      <div class="row" style="margin: 0; justify-content: space-between; align-items: center;">
+        <div>
+          <strong style="color: var(--accent); font-size: 13.5px;">Simulación Histórica (Datos pasados 2022–2026)</strong>
+          <p class="muted" style="margin: 4px 0 0 0; font-size: 12.5px;">
+            Este módulo procesa velas pasadas descargadas de Binance para comprobar la efectividad matemática de las reglas. 
+            <strong>Las operaciones que verás abajo NO son operaciones en vivo ni usan tu saldo actual.</strong> Para ver tus operaciones en vivo ve a la pestaña <strong>Panel</strong>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="cardhead"><h2>Parámetros del Backtest</h2></div>
+      <p class="muted">Prueba la estrategia con datos históricos reales de Binance, con la misma lógica y gestión de riesgo del bot en vivo.</p>
+      <div class="formgrid">
+        <div class="field"><label for="btStrat">Estrategia a simular</label><select id="btStrat"></select></div>
+        <div class="field"><label for="btDesde">Desde</label><input id="btDesde" type="date" value="2022-01-01"></div>
+        <div class="field"><label for="btHasta">Hasta</label><input id="btHasta" type="date"></div>
+        <div class="field"><label for="btTend">Tendencia</label><select id="btTend"></select></div>
+        <div class="field"><label for="btSup">Filtro superior</label><select id="btSup"></select></div>
+        <div class="field"><label for="btZona">Retrocesos (zona)</label><select id="btZona"></select></div>
+        <div class="field"><label for="btGatillo">Gatillo</label><select id="btGatillo"></select></div>
+        <div class="field"><label for="btMart">Martingala</label><select id="btMart"><option value="__cfg__">(config)</option><option value="si">Sí</option><option value="no">No</option></select></div>
+        <div class="field"><label for="btMargen">Margen por operación (USDT)</label><input id="btMargen" type="number" step="1" placeholder="(config)"></div>
+        <div class="field"><label for="btRiesgoM">Riesgo máx. martingala (USDT)</label><input id="btRiesgoM" type="number" step="0.5" placeholder="(config)"></div>
+        <div class="field"><label for="btVentana">Ventana de agotamiento</label><input id="btVentana" type="number" min="1" max="5" placeholder="(config)"></div>
+        <div class="field"><label for="btSlip">Slippage</label><input id="btSlip" type="number" step="0.0001" value="0.0002"></div>
+      </div>
+      <div class="row"><button class="btn primary" id="btnBtRun">Ejecutar backtest</button><button class="btn small" id="btnBtCancel" hidden>Cancelar</button></div>
+      <div class="progress" id="btProg" hidden><div id="btBar"></div></div>
+      <small class="muted" id="btMsg"></small>
+    </section>
+    <section class="card wide" id="btResult" hidden>
+      <div class="cardhead"><h2>Resultado</h2></div>
+      <div id="btNotes" class="notes"></div>
+      <div id="btMetrics" class="metrics"></div>
+      <canvas id="btEquity" class="equity"></canvas>
+      <h3>Embudo de la estrategia</h3>
+      <div id="btFunnel" class="kv"></div>
+      <h3>Por año</h3>
+      <div id="btYears" class="kv"></div>
+      <h3>Operaciones</h3>
+      <div class="tablewrap"><table class="grid-table" id="btTrades"><thead><tr><th>Entrada</th><th>Lado</th><th>Patrón</th><th>Entrada $</th><th>Salida $</th><th>Motivo</th><th>Neto USDT</th><th>R</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+</main>
+
+<!-- ===================================================== REGISTRO -->
+<main id="tab-logs" class="tabpane">
+  <section class="card">
+    <div class="cardhead"><h2>Registro de actividad</h2></div>
+    <div id="logbox" class="logbox"></div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgText"></p>
+    <input id="dlgInput" type="text" autocomplete="off" hidden>
+    <div class="row end"><button class="btn" value="cancel">Cancelar</button><button class="btn danger" id="dlgOk" value="ok">Confirmar</button></div>
+  </form>
+</dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
